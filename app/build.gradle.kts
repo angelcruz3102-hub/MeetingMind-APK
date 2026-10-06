@@ -7,6 +7,9 @@ android {
     namespace = "com.meetingmind.app"
     compileSdk = 34
 
+    // 👇 AÑADE ESTA LÍNEA
+    buildToolsVersion = "34.0.0" 
+
     defaultConfig {
         applicationId = "com.meetingmind.app"
         minSdk = 24
