@@ -29,6 +29,9 @@ jobs:
       - name: 📦 Generar Gradle Wrapper
         run: gradle wrapper --gradle-version 8.7 --distribution-type bin
 
+      - name: 🧹 Limpiar Caché de Gradle
+        run: rm -rf ~/.gradle/caches/
+
       - name: 🔧 Permisos de ejecución
         run: chmod +x ./gradlew
 
