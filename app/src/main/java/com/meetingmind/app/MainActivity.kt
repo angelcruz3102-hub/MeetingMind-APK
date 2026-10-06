@@ -4,7 +4,6 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -40,9 +39,11 @@ class MainActivity : AppCompatActivity() {
     private val permLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { result ->
-        val micOk = result[Manifest.permission.RECORD_AUDIO] == true ||
-                ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                    == PackageManager.PERMISSION_GRANTED
+        // 🔧 FIX: paréntesis explícitos + Elvis para evitar conflicto de tipos
+        val micOk = (result[Manifest.permission.RECORD_AUDIO] ?: false) ||
+                (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                        == PackageManager.PERMISSION_GRANTED)
+
         if (micOk) {
             launchRecordingService()
         } else {
@@ -102,7 +103,6 @@ class MainActivity : AppCompatActivity() {
                 view: WebView,
                 request: WebResourceRequest
             ): Boolean {
-                // Abre enlaces externos en el navegador del sistema
                 val url = request.url
                 if (url.host != "appassets.androidplatform.net") {
                     startActivity(Intent(Intent.ACTION_VIEW, url))
@@ -113,7 +113,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         webView.webChromeClient = object : WebChromeClient() {
-            // Permite getUserMedia si en algún momento se usa el modo web
             override fun onPermissionRequest(request: PermissionRequest) {
                 request.grant(request.resources)
             }
@@ -123,7 +122,6 @@ class MainActivity : AppCompatActivity() {
         webView.addJavascriptInterface(WebAppInterface(), "AndroidNative")
 
         // ─── Cargar HTML desde el asset loader ─────────────────
-        // ⚠️ NO usamos file:///android_asset/index.html porque bloquea CORS.
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
     }
 
@@ -185,7 +183,7 @@ class MainActivity : AppCompatActivity() {
     private fun sendAudioToWeb(base64Audio: String) {
         runOnUiThread {
             val total = base64Audio.length
-            val chunkSize = 400_000 // ~400 KB por chunk
+            val chunkSize = 400_000
             Log.d(TAG, "Enviando ${total} chars Base64 al WebView")
 
             // 1. Inicializar buffer
@@ -194,7 +192,7 @@ class MainActivity : AppCompatActivity() {
                 null
             )
 
-            // 2. Enviar por trozos (el orden está garantizado por el UI thread)
+            // 2. Enviar por trozos
             var offset = 0
             while (offset < total) {
                 val end = minOf(offset + chunkSize, total)
@@ -204,7 +202,7 @@ class MainActivity : AppCompatActivity() {
                 offset = end
             }
 
-            // 3. Disparar callback
+            // 3. Disparar callback en el HTML
             webView.evaluateJavascript(
                 """
                 (function(){
