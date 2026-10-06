@@ -1689,8 +1689,32 @@
       btn.disabled = !ok;
     }
 
+    /* ═══════════════════════════════════════════════════════════
+       🔥 NATIVO — startRecordingProcess() con detección Android
+       ═══════════════════════════════════════════════════════════ */
     async function startRecordingProcess() {
       if (isRecordingActive) return;
+
+      // ── MODO NATIVO ANDROID (WebView con JavascriptInterface) ──
+      if (window.AndroidNative && typeof window.AndroidNative.startRecording === 'function') {
+        try {
+          window.AndroidNative.startRecording();   // Kotlin pide permisos + arranca el FGS
+          isRecordingActive = true;
+          const btn = document.getElementById('btn-start-record');
+          btn.textContent = '⏹️ Detener Grabación';
+          btn.classList.add('recording');
+          setStatus('active', 'Grabando en segundo plano (nativo Android)…');
+          disableButtonsExcept(btn);
+        } catch (err) {
+          showToast('❌ Error al iniciar grabación nativa: ' + err.message);
+          isRecordingActive = false;
+          resetRecordButton();
+          enableAllButtons();
+        }
+        return;
+      }
+
+      // ── MODO WEB ORIGINAL (navegador) ──
       try {
         micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         isRecordingActive = true;
@@ -1762,9 +1786,22 @@
       }
     }
 
+    /* ═══════════════════════════════════════════════════════════
+       🔥 NATIVO — stopRecordingProcess() con detección Android
+       ═══════════════════════════════════════════════════════════ */
     function stopRecordingProcess() {
       if (!isRecordingActive) return;
       isRecordingActive = false;
+
+      // ── MODO NATIVO ANDROID ──
+      if (window.AndroidNative && typeof window.AndroidNative.stopRecording === 'function') {
+        setStatus('loading', 'Procesando grabación nativa…');
+        // La UI se restaura cuando llegue window.receiveNativeAudio()
+        window.AndroidNative.stopRecording();
+        return;
+      }
+
+      // ── MODO WEB ORIGINAL ──
       clearTimeout(recordingChunkInterval);
       if (currentRecorder && currentRecorder.state !== 'inactive') currentRecorder.stop();
       if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
@@ -1780,6 +1817,58 @@
         btn.classList.remove('recording');
       }
     }
+
+    /* ═══════════════════════════════════════════════════════════
+       🔥 NATIVO — Callback que Kotlin invoca con el audio en Base64
+       ═══════════════════════════════════════════════════════════ */
+    window.receiveNativeAudio = async function (base64Audio) {
+      try {
+        if (!base64Audio || typeof base64Audio !== 'string' || base64Audio.length < 10) {
+          throw new Error('Audio nativo vacío o inválido.');
+        }
+
+        // 1. Quitar prefijo "data:audio/...;base64," si viniera
+        const cleanB64 = base64Audio.includes(',')
+          ? base64Audio.split(',').pop()
+          : base64Audio;
+
+        // 2. Base64 → Uint8Array → Blob → File
+        const binary = atob(cleanB64);
+        const len = binary.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+
+        const blob = new Blob([bytes], { type: 'audio/mp4' });
+        const file = new File(
+          [blob],
+          `record_native_${Date.now()}.m4a`,
+          { type: 'audio/mp4' }
+        );
+
+        // 3. Restaurar UI y lanzar el flujo de transcripción existente
+        resetRecordButton();
+        setStatus('loading', 'Transcribiendo grabación nativa…');
+
+        await transcribeRecordedChunk(file);
+      } catch (err) {
+        console.error('[receiveNativeAudio]', err);
+        showToast('❌ Error al procesar audio nativo: ' + err.message);
+        resetRecordButton();
+        setStatus('error', 'Error al procesar audio nativo');
+      } finally {
+        isRecordingActive = false;
+        enableAllButtons();
+      }
+    };
+
+    /* 🔥 NATIVO — Error reportado desde Kotlin (p. ej. permiso denegado) */
+    window.receiveNativeError = function (message) {
+      showToast('❌ ' + (message || 'Error en grabación nativa'));
+      isRecordingActive = false;
+      resetRecordButton();
+      setStatus('error', message || 'Error en grabación nativa');
+      enableAllButtons();
+    };
 
     function showAnalyzeUI() {
       document.getElementById('btn-analyze').style.display = 'flex';
