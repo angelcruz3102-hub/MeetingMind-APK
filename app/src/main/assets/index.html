@@ -36,7 +36,13 @@
       --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
 
-    html, body { height: 100%; overscroll-behavior: none; }
+    /* 🔧 FIX SCROLL — quitado height:100% de body, añadido overflow-y:auto */
+    html { height: 100%; }
+    body {
+      overscroll-behavior: none;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
 
     body {
       background: var(--bg);
@@ -49,7 +55,7 @@
       padding: 20px 14px calc(40px + var(--safe-bottom));
       -webkit-user-select: none;
       user-select: none;
-      touch-action: manipulation;
+      touch-action: pan-y; /* 🔧 FIX SCROLL — era manipulation */
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
@@ -150,7 +156,6 @@
       padding-top: 16px;
     }
 
-    /* 🔥 NUEVO — textarea de API keys */
     #groq-keys-input {
       width: 100%;
       min-height: 110px;
@@ -1105,7 +1110,6 @@
       </div>
     </div>
 
-    <!-- 🔥 NUEVO — Sección de API Keys editables -->
     <div class="key-divider">
       <label>🔑 API Keys de Groq (editables sin recompilar)</label>
       <p style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;line-height:1.5;">
@@ -1247,13 +1251,9 @@
 
   <script>
     // ═══════════════════ API KEYS Y ENDPOINTS (GROQ) ═══════════════════
-    // 🔥 NUEVO — Sistema de keys editables con persistencia en localStorage
-
     const GROQ_KEYS_DEFAULT = [
-      "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",
-      "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",
-      "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",
-      "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"
+      "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",
+      "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"
     ];
 
     const LS_KEY_GROQ_KEYS = 'meetingmind_groq_keys';
@@ -1277,7 +1277,6 @@
       return [...GROQ_KEYS_DEFAULT];
     }
 
-    // ⚠️ OJO: es `let`, no `const`, porque saveGroqKeys lo reasigna
     let GROQ_KEYS = loadGroqKeys();
 
     let groqKeyIndex = 0;
@@ -1287,7 +1286,6 @@
       return key;
     }
 
-    // 🔥 NUEVO — Guardar keys personalizadas
     function saveGroqKeys(keysArray) {
       const cleaned = keysArray
         .map(k => (typeof k === 'string' ? k.trim() : ''))
@@ -1306,7 +1304,6 @@
       }
     }
 
-    // 🔥 NUEVO — Restaurar a las keys de fábrica
     function resetGroqKeys() {
       try { localStorage.removeItem(LS_KEY_GROQ_KEYS); } catch (e) {}
       GROQ_KEYS = [...GROQ_KEYS_DEFAULT];
@@ -1314,7 +1311,6 @@
       cachedAvailableModels = null;
     }
 
-    // 🔥 NUEVO — Actualizar contador del botón de diagnóstico
     function updateKeysCountUI() {
       const el = document.getElementById('keys-count-diag');
       if (el) el.textContent = GROQ_KEYS.length;
@@ -1526,7 +1522,6 @@
       const tabs = document.querySelectorAll('.tab');
       const tabPanes = document.querySelectorAll('.tab-pane');
 
-      // 🔥 NUEVO — Inicializar UI de API keys
       const keysInput = document.getElementById('groq-keys-input');
       const keysStatus = document.getElementById('keys-save-status');
       keysInput.value = GROQ_KEYS.join('\n');
@@ -1841,13 +1836,9 @@
       btn.disabled = !ok;
     }
 
-    /* ═══════════════════════════════════════════════════════════
-       MODO NATIVO — startRecordingProcess() con detección Android
-       ═══════════════════════════════════════════════════════════ */
     async function startRecordingProcess() {
       if (isRecordingActive) return;
 
-      // ── MODO NATIVO ANDROID (WebView con JavascriptInterface) ──
       if (window.AndroidNative && typeof window.AndroidNative.startRecording === 'function') {
         try {
           window.AndroidNative.startRecording();
@@ -1866,7 +1857,6 @@
         return;
       }
 
-      // ── MODO WEB ORIGINAL (navegador) ──
       try {
         micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
         isRecordingActive = true;
@@ -1938,21 +1928,16 @@
       }
     }
 
-    /* ═══════════════════════════════════════════════════════════
-       MODO NATIVO — stopRecordingProcess() con detección Android
-       ═══════════════════════════════════════════════════════════ */
     function stopRecordingProcess() {
       if (!isRecordingActive) return;
       isRecordingActive = false;
 
-      // ── MODO NATIVO ANDROID ──
       if (window.AndroidNative && typeof window.AndroidNative.stopRecording === 'function') {
         setStatus('loading', 'Procesando grabación nativa…');
         window.AndroidNative.stopRecording();
         return;
       }
 
-      // ── MODO WEB ORIGINAL ──
       clearTimeout(recordingChunkInterval);
       if (currentRecorder && currentRecorder.state !== 'inactive') currentRecorder.stop();
       if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
@@ -1969,9 +1954,6 @@
       }
     }
 
-    /* ═══════════════════════════════════════════════════════════
-       MODO NATIVO — Callback que Kotlin invoca con el audio en Base64
-       ═══════════════════════════════════════════════════════════ */
     window.receiveNativeAudio = async function (base64Audio) {
       try {
         if (!base64Audio || typeof base64Audio !== 'string' || base64Audio.length < 10) {
