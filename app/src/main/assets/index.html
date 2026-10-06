@@ -150,6 +150,44 @@
       padding-top: 16px;
     }
 
+    /* 🔥 NUEVO — textarea de API keys */
+    #groq-keys-input {
+      width: 100%;
+      min-height: 110px;
+      background: var(--bg);
+      color: var(--text);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 11px 14px;
+      font-family: 'SFMono-Regular', Consolas, Menlo, monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+      outline: none;
+      resize: vertical;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    #groq-keys-input:focus { border-color: var(--accent); }
+    #keys-save-status {
+      font-size: 0.75rem;
+      margin-top: 8px;
+      color: var(--muted);
+      min-height: 1em;
+    }
+    .keys-btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .keys-btn-row .btn-secondary {
+      flex: 1;
+      min-width: 130px;
+      font-size: 0.8rem;
+      padding: 10px 14px;
+      min-height: 44px;
+    }
+
     .card {
       width: 100%;
       max-width: var(--max-width);
@@ -1067,11 +1105,31 @@
       </div>
     </div>
 
+    <!-- 🔥 NUEVO — Sección de API Keys editables -->
+    <div class="key-divider">
+      <label>🔑 API Keys de Groq (editables sin recompilar)</label>
+      <p style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;line-height:1.5;">
+        Pega una key por línea. Deben empezar por <code style="background:rgba(135,131,120,0.15);padding:1px 5px;border-radius:3px;">gsk_</code>.
+        Se guardan localmente en este dispositivo y <strong>persisten entre actualizaciones del APK</strong>.
+      </p>
+      <textarea id="groq-keys-input" 
+                placeholder="gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&#10;gsk_yyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+                spellcheck="false"
+                autocapitalize="off"
+                autocomplete="off"
+                autocorrect="off"></textarea>
+      <div class="keys-btn-row">
+        <button id="btn-save-keys" class="btn-secondary">💾 Guardar Keys</button>
+        <button id="btn-reset-keys" class="btn-secondary">↺ Restaurar Defaults</button>
+      </div>
+      <div id="keys-save-status"></div>
+    </div>
+
     <div class="key-divider">
       <label>🔬 Diagnóstico de conexión</label>
       <div style="margin-top: 10px;">
         <button id="btn-test-apis" class="btn-secondary" style="font-size: 0.8rem; padding: 9px 12px; min-height: 44px; width: 100%;">
-          🔬 Probar las 5 API Keys con Groq
+          🔬 Probar las <span id="keys-count-diag">2</span> API Keys con Groq
         </button>
         <div id="diag-result" style="display:none;"></div>
       </div>
@@ -1189,15 +1247,77 @@
 
   <script>
     // ═══════════════════ API KEYS Y ENDPOINTS (GROQ) ═══════════════════
-    const GROQ_KEYS = [
-      "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",
-      "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"
+    // 🔥 NUEVO — Sistema de keys editables con persistencia en localStorage
+
+    const GROQ_KEYS_DEFAULT = [
+      "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",
+      "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",
+      "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",
+      "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"
     ];
+
+    const LS_KEY_GROQ_KEYS = 'meetingmind_groq_keys';
+
+    function isValidGroqKey(k) {
+      return typeof k === 'string' && k.trim().startsWith('gsk_') && k.trim().length > 20;
+    }
+
+    function loadGroqKeys() {
+      try {
+        const stored = localStorage.getItem(LS_KEY_GROQ_KEYS);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(isValidGroqKey)) {
+            return parsed;
+          }
+        }
+      } catch (e) {
+        console.warn('No se pudieron cargar keys guardadas:', e);
+      }
+      return [...GROQ_KEYS_DEFAULT];
+    }
+
+    // ⚠️ OJO: es `let`, no `const`, porque saveGroqKeys lo reasigna
+    let GROQ_KEYS = loadGroqKeys();
+
     let groqKeyIndex = 0;
     function getNextGroqKey() {
       const key = GROQ_KEYS[groqKeyIndex];
       groqKeyIndex = (groqKeyIndex + 1) % GROQ_KEYS.length;
       return key;
+    }
+
+    // 🔥 NUEVO — Guardar keys personalizadas
+    function saveGroqKeys(keysArray) {
+      const cleaned = keysArray
+        .map(k => (typeof k === 'string' ? k.trim() : ''))
+        .filter(isValidGroqKey);
+
+      if (cleaned.length === 0) return { ok: false, error: 'No hay keys válidas.' };
+
+      try {
+        localStorage.setItem(LS_KEY_GROQ_KEYS, JSON.stringify(cleaned));
+        GROQ_KEYS = cleaned;
+        groqKeyIndex = 0;
+        cachedAvailableModels = null;
+        return { ok: true, count: cleaned.length };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
+
+    // 🔥 NUEVO — Restaurar a las keys de fábrica
+    function resetGroqKeys() {
+      try { localStorage.removeItem(LS_KEY_GROQ_KEYS); } catch (e) {}
+      GROQ_KEYS = [...GROQ_KEYS_DEFAULT];
+      groqKeyIndex = 0;
+      cachedAvailableModels = null;
+    }
+
+    // 🔥 NUEVO — Actualizar contador del botón de diagnóstico
+    function updateKeysCountUI() {
+      const el = document.getElementById('keys-count-diag');
+      if (el) el.textContent = GROQ_KEYS.length;
     }
 
     const GROQ_AUDIO_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
@@ -1406,6 +1526,38 @@
       const tabs = document.querySelectorAll('.tab');
       const tabPanes = document.querySelectorAll('.tab-pane');
 
+      // 🔥 NUEVO — Inicializar UI de API keys
+      const keysInput = document.getElementById('groq-keys-input');
+      const keysStatus = document.getElementById('keys-save-status');
+      keysInput.value = GROQ_KEYS.join('\n');
+      updateKeysCountUI();
+
+      document.getElementById('btn-save-keys').addEventListener('click', () => {
+        const lines = keysInput.value.split('\n').map(s => s.trim()).filter(Boolean);
+        const result = saveGroqKeys(lines);
+
+        if (result.ok) {
+          keysStatus.textContent = `✅ ${result.count} key(s) guardada(s). La app las usará en el próximo request.`;
+          keysStatus.style.color = 'var(--success)';
+          updateKeysCountUI();
+          showToast(`✅ ${result.count} key(s) guardada(s)`);
+        } else {
+          keysStatus.textContent = `⚠️ ${result.error}`;
+          keysStatus.style.color = 'var(--error)';
+          showToast('⚠️ No se pudieron guardar las keys');
+        }
+      });
+
+      document.getElementById('btn-reset-keys').addEventListener('click', () => {
+        if (!confirm('¿Restaurar las API keys de fábrica? Se perderán las personalizadas.')) return;
+        resetGroqKeys();
+        keysInput.value = GROQ_KEYS.join('\n');
+        keysStatus.textContent = '↺ Keys restauradas a las de fábrica.';
+        keysStatus.style.color = 'var(--muted)';
+        updateKeysCountUI();
+        showToast('↺ Keys restauradas');
+      });
+
       fetchAvailableModels().then(models => {
         if (models.length > 0) {
           modelSelect.innerHTML = models.map(m => `<option value="${m}">🧠 ${m}</option>`).join('');
@@ -1534,7 +1686,7 @@
           const resultEl = document.getElementById('diag-result');
           resultEl.style.display = 'block';
           resultEl.className = 'diag-result';
-          resultEl.textContent = '🔬 Probando las 5 API Keys contra Groq...\n\n';
+          resultEl.textContent = `🔬 Probando las ${GROQ_KEYS.length} API Keys contra Groq...\n\n`;
 
           let okCount = 0;
           const lines = [];
@@ -1542,7 +1694,7 @@
           for (let i = 0; i < GROQ_KEYS.length; i++) {
             const key = GROQ_KEYS[i];
             const preview = key.slice(0, 12) + '…' + key.slice(-4);
-            lines.push(`[${i + 1}/5] Probando ${preview}...`);
+            lines.push(`[${i + 1}/${GROQ_KEYS.length}] Probando ${preview}...`);
             resultEl.textContent = lines.join('\n');
 
             try {
@@ -1554,27 +1706,27 @@
               if (res.ok) {
                 const data = await res.json();
                 const count = (data.data || []).length;
-                lines[lines.length - 1] = `✅ [${i + 1}/5] ${preview} → OK (${count} modelos)`;
+                lines[lines.length - 1] = `✅ [${i + 1}/${GROQ_KEYS.length}] ${preview} → OK (${count} modelos)`;
                 okCount++;
               } else if (res.status === 401 || res.status === 403) {
-                lines[lines.length - 1] = `❌ [${i + 1}/5] ${preview} → REVOCADA/INVÁLIDA (${res.status})`;
+                lines[lines.length - 1] = `❌ [${i + 1}/${GROQ_KEYS.length}] ${preview} → REVOCADA/INVÁLIDA (${res.status})`;
               } else if (res.status === 429) {
-                lines[lines.length - 1] = `⚠️ [${i + 1}/5] ${preview} → Rate limit (429)`;
+                lines[lines.length - 1] = `⚠️ [${i + 1}/${GROQ_KEYS.length}] ${preview} → Rate limit (429)`;
               } else {
-                lines[lines.length - 1] = `⚠️ [${i + 1}/5] ${preview} → HTTP ${res.status}`;
+                lines[lines.length - 1] = `⚠️ [${i + 1}/${GROQ_KEYS.length}] ${preview} → HTTP ${res.status}`;
               }
             } catch (err) {
-              lines[lines.length - 1] = `❌ [${i + 1}/5] ${preview} → ${err.message}`;
+              lines[lines.length - 1] = `❌ [${i + 1}/${GROQ_KEYS.length}] ${preview} → ${err.message}`;
             }
             resultEl.textContent = lines.join('\n');
           }
 
-          const summary = `\n\n📊 Resultado: ${okCount}/5 keys funcionan.`;
+          const summary = `\n\n📊 Resultado: ${okCount}/${GROQ_KEYS.length} keys funcionan.`;
           resultEl.textContent = lines.join('\n') + summary;
-          resultEl.className = 'diag-result ' + (okCount === 5 ? 'ok' : 'fail');
+          resultEl.className = 'diag-result ' + (okCount === GROQ_KEYS.length ? 'ok' : 'fail');
 
           if (okCount === 0) {
-            lines.push('\n\n🚨 TODAS las keys están muertas. Ve a https://console.groq.com/keys y genera nuevas.');
+            lines.push('\n\n🚨 TODAS las keys están muertas. Ve a https://console.groq.com/keys y genera nuevas. Luego pégalas arriba en "🔑 API Keys de Groq".');
             resultEl.textContent = lines.join('\n');
           }
         });
@@ -1690,7 +1842,7 @@
     }
 
     /* ═══════════════════════════════════════════════════════════
-       🔥 NATIVO — startRecordingProcess() con detección Android
+       MODO NATIVO — startRecordingProcess() con detección Android
        ═══════════════════════════════════════════════════════════ */
     async function startRecordingProcess() {
       if (isRecordingActive) return;
@@ -1698,7 +1850,7 @@
       // ── MODO NATIVO ANDROID (WebView con JavascriptInterface) ──
       if (window.AndroidNative && typeof window.AndroidNative.startRecording === 'function') {
         try {
-          window.AndroidNative.startRecording();   // Kotlin pide permisos + arranca el FGS
+          window.AndroidNative.startRecording();
           isRecordingActive = true;
           const btn = document.getElementById('btn-start-record');
           btn.textContent = '⏹️ Detener Grabación';
@@ -1787,7 +1939,7 @@
     }
 
     /* ═══════════════════════════════════════════════════════════
-       🔥 NATIVO — stopRecordingProcess() con detección Android
+       MODO NATIVO — stopRecordingProcess() con detección Android
        ═══════════════════════════════════════════════════════════ */
     function stopRecordingProcess() {
       if (!isRecordingActive) return;
@@ -1796,7 +1948,6 @@
       // ── MODO NATIVO ANDROID ──
       if (window.AndroidNative && typeof window.AndroidNative.stopRecording === 'function') {
         setStatus('loading', 'Procesando grabación nativa…');
-        // La UI se restaura cuando llegue window.receiveNativeAudio()
         window.AndroidNative.stopRecording();
         return;
       }
@@ -1819,7 +1970,7 @@
     }
 
     /* ═══════════════════════════════════════════════════════════
-       🔥 NATIVO — Callback que Kotlin invoca con el audio en Base64
+       MODO NATIVO — Callback que Kotlin invoca con el audio en Base64
        ═══════════════════════════════════════════════════════════ */
     window.receiveNativeAudio = async function (base64Audio) {
       try {
@@ -1827,12 +1978,10 @@
           throw new Error('Audio nativo vacío o inválido.');
         }
 
-        // 1. Quitar prefijo "data:audio/...;base64," si viniera
         const cleanB64 = base64Audio.includes(',')
           ? base64Audio.split(',').pop()
           : base64Audio;
 
-        // 2. Base64 → Uint8Array → Blob → File
         const binary = atob(cleanB64);
         const len = binary.length;
         const bytes = new Uint8Array(len);
@@ -1845,7 +1994,6 @@
           { type: 'audio/mp4' }
         );
 
-        // 3. Restaurar UI y lanzar el flujo de transcripción existente
         resetRecordButton();
         setStatus('loading', 'Transcribiendo grabación nativa…');
 
@@ -1861,7 +2009,6 @@
       }
     };
 
-    /* 🔥 NATIVO — Error reportado desde Kotlin (p. ej. permiso denegado) */
     window.receiveNativeError = function (message) {
       showToast('❌ ' + (message || 'Error en grabación nativa'));
       isRecordingActive = false;
