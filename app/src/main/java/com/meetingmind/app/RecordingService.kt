@@ -5,17 +5,26 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.media.MediaRecorder
+import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.IBinder
+import android.os.ParcelFileDescriptor
+import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import java.io.File
 import java.io.FileInputStream
+import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class RecordingService : Service() {
 
@@ -29,7 +38,10 @@ class RecordingService : Service() {
     }
 
     private var recorder: MediaRecorder? = null
-    private var outputFile: File? = null
+    private var outputFile: File? = null                  // Solo Android 7-9
+    private var outputUri: Uri? = null                    // Solo Android 10+
+    private var outputPfd: ParcelFileDescriptor? = null   // Solo Android 10+
+    private var outputDisplayName: String = ""
     private var isRecording = false
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -43,6 +55,49 @@ class RecordingService : Service() {
     }
 
     // ─────────────────────────────────────────────────────────────
+    // Crear destino en Music/MeetingMind/
+    // ─────────────────────────────────────────────────────────────
+    private fun createOutputTarget() {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        outputDisplayName = "MeetingMind_${timestamp}.m4a"
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // ── Android 10+ → MediaStore (sin permisos de almacenamiento) ──
+            val values = ContentValues().apply {
+                put(MediaStore.Audio.Media.DISPLAY_NAME, outputDisplayName)
+                put(MediaStore.Audio.Media.MIME_TYPE, "audio/mp4")
+                put(
+                    MediaStore.Audio.Media.RELATIVE_PATH,
+                    Environment.DIRECTORY_MUSIC + "/MeetingMind"
+                )
+                put(MediaStore.Audio.Media.IS_PENDING, 1)
+            }
+            val collection = MediaStore.Audio.Media.getContentUri(
+                MediaStore.VOLUME_EXTERNAL_PRIMARY
+            )
+            val uri = contentResolver.insert(collection, values)
+                ?: throw IOException("No se pudo crear el archivo en MediaStore")
+            outputUri = uri
+            outputPfd = contentResolver.openFileDescriptor(uri, "w")
+                ?: throw IOException("No se pudo abrir el descriptor del archivo")
+            Log.i(TAG, "Destino MediaStore: $uri → Music/MeetingMind/$outputDisplayName")
+        } else {
+            // ── Android 7-9 → File API legacy (requiere WRITE_EXTERNAL_STORAGE) ──
+            @Suppress("DEPRECATION")
+            val musicDir = Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_MUSIC
+            )
+            val appDir = File(musicDir, "MeetingMind")
+            if (!appDir.exists() && !appDir.mkdirs()) {
+                throw IOException("No se pudo crear la carpeta Music/MeetingMind")
+            }
+            val file = File(appDir, outputDisplayName)
+            outputFile = file
+            Log.i(TAG, "Destino File legacy: ${file.absolutePath}")
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────
     // INICIO DE GRABACIÓN
     // ─────────────────────────────────────────────────────────────
     private fun startRecording() {
@@ -51,24 +106,29 @@ class RecordingService : Service() {
         try {
             createChannel()
             promoteToForeground()
-
-            outputFile = File(cacheDir, "rec_${System.currentTimeMillis()}.m4a")
+            createOutputTarget()
 
             recorder = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S)
                 MediaRecorder(this) else @Suppress("DEPRECATION") MediaRecorder())
                 .apply {
                     setAudioSource(MediaRecorder.AudioSource.MIC)
-                    setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)   // contenedor .m4a
+                    setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                     setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
                     setAudioSamplingRate(16_000)
                     setAudioEncodingBitRate(64_000)
                     setAudioChannels(1)
-                    setOutputFile(outputFile!!.absolutePath)
+
+                    if (outputUri != null && outputPfd != null) {
+                        setOutputFile(outputPfd!!.fileDescriptor)
+                    } else {
+                        setOutputFile(outputFile!!.absolutePath)
+                    }
+
                     prepare()
                     start()
                 }
             isRecording = true
-            Log.i(TAG, "Grabación iniciada → ${outputFile!!.absolutePath}")
+            Log.i(TAG, "Grabación iniciada → $outputDisplayName")
         } catch (e: Exception) {
             Log.e(TAG, "Error al iniciar MediaRecorder", e)
             cleanupRecorder()
@@ -79,6 +139,7 @@ class RecordingService : Service() {
 
     // ─────────────────────────────────────────────────────────────
     // DETENER → Base64 → callback a la Activity
+    // ⚠️ EL ARCHIVO **NO** SE BORRA: queda en Music/MeetingMind/
     // ─────────────────────────────────────────────────────────────
     private fun stopRecordingAndSend() {
         if (!isRecording) {
@@ -92,24 +153,47 @@ class RecordingService : Service() {
             cleanupRecorder()
         }
 
-        val file = outputFile
-        if (file != null && file.exists() && file.length() > 0) {
-            // Procesamos en hilo de fondo (Base64 es pesado)
-            Thread {
-                try {
-                    val bytes = FileInputStream(file).use { it.readBytes() }
+        // Finalizar la transacción en MediaStore → archivo visible para el usuario
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && outputUri != null) {
+            try {
+                val values = ContentValues().apply {
+                    put(MediaStore.Audio.Media.IS_PENDING, 0)
+                }
+                contentResolver.update(outputUri!!, values, null, null)
+            } catch (e: Exception) {
+                Log.w(TAG, "No se pudo finalizar IS_PENDING", e)
+            }
+        }
+
+        // Procesar Base64 en hilo de fondo
+        Thread {
+            try {
+                val bytes: ByteArray? = when {
+                    outputUri != null -> {
+                        contentResolver.openInputStream(outputUri!!)?.use { it.readBytes() }
+                    }
+                    outputFile != null && outputFile!!.exists() -> {
+                        FileInputStream(outputFile!!).use { it.readBytes() }
+                    }
+                    else -> null
+                }
+
+                if (bytes != null && bytes.isNotEmpty()) {
                     val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
                     RecordingBridge.onAudioReady?.invoke(base64)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error codificando Base64", e)
-                } finally {
-                    file.delete()
-                    RecordingBridge.onRecordingStopped?.invoke()
+                } else {
+                    Log.w(TAG, "No se pudo leer el archivo generado")
                 }
-            }.start()
-        } else {
-            RecordingBridge.onRecordingStopped?.invoke()
-        }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error codificando Base64", e)
+            } finally {
+                // 🔥 CAMBIO CLAVE: NO BORRAMOS EL ARCHIVO
+                // El archivo permanece en Music/MeetingMind/ para que el usuario
+                // pueda reintentar la transcripción con "Subir Audios" si falla la red.
+                // file.delete()  ← ELIMINADO INTENCIONALMENTE
+                RecordingBridge.onRecordingStopped?.invoke()
+            }
+        }.start()
 
         stopForegroundCompat()
         stopSelf()
@@ -118,11 +202,13 @@ class RecordingService : Service() {
     private fun cleanupRecorder() {
         try { recorder?.reset(); recorder?.release() } catch (_: Exception) {}
         recorder = null
+        try { outputPfd?.close() } catch (_: Exception) {}
+        outputPfd = null
         isRecording = false
     }
 
     // ─────────────────────────────────────────────────────────────
-    // FOREGROUND + NOTIFICACIÓN
+    // FOREGROUND + NOTIFICACIÓN (sin cambios)
     // ─────────────────────────────────────────────────────────────
     private fun promoteToForeground() {
         val notif = buildNotification()
@@ -142,7 +228,6 @@ class RecordingService : Service() {
     }
 
     private fun buildNotification(): Notification {
-        // Tap en la notificación → abre MainActivity
         val openApp = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -152,15 +237,16 @@ class RecordingService : Service() {
 
         val contentPi = PendingIntent.getActivity(this, 0, openApp, piFlags)
 
-        // Botón "Detener" en la notificación
-        val stopIntent = Intent(this, RecordingService::class.java).apply { action = ACTION_STOP }
+        val stopIntent = Intent(this, RecordingService::class.java).apply {
+            action = ACTION_STOP
+        }
         val stopPi = PendingIntent.getService(this, 1, stopIntent, piFlags)
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentTitle("🎙️ Meeting Mind grabando")
             .setContentText("Grabación activa en segundo plano")
-            .setOngoing(true)                    // ← INMATABLE
+            .setOngoing(true)
             .setAutoCancel(false)
             .setOnlyAlertOnce(true)
             .setShowWhen(true)
