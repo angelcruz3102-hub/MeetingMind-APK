@@ -1427,14 +1427,15 @@
       return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function showToast(msg) {
-      const t = document.getElementById('toast');
-      if (!t) return;
-      t.textContent = msg;
-      t.classList.add('show');
-      clearTimeout(showToast._timer);
-      showToast._timer = setTimeout(() => t.classList.remove('show'), 3000);
-    }
+    function showToast(msg, durationMs) {
+  const t = document.getElementById('toast');
+  if (!t) return;
+  const dur = (typeof durationMs === 'number' && durationMs > 0) ? durationMs : 3000;
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => t.classList.remove('show'), dur);
+}
 
     function setStatus(type, text) {
       const dot = document.getElementById('status-dot');
@@ -1955,41 +1956,81 @@
     }
 
     window.receiveNativeAudio = async function (base64Audio) {
-      try {
-        if (!base64Audio || typeof base64Audio !== 'string' || base64Audio.length < 10) {
-          throw new Error('Audio nativo vacío o inválido.');
-        }
+  try {
+    if (!base64Audio || typeof base64Audio !== 'string' || base64Audio.length < 10) {
+      throw new Error('Audio nativo vacío o inválido.');
+    }
 
-        const cleanB64 = base64Audio.includes(',')
-          ? base64Audio.split(',').pop()
-          : base64Audio;
+    const cleanB64 = base64Audio.includes(',')
+      ? base64Audio.split(',').pop()
+      : base64Audio;
 
-        const binary = atob(cleanB64);
-        const len = binary.length;
-        const bytes = new Uint8Array(len);
-        for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+    const binary = atob(cleanB64);
+    const len = binary.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
 
-        const blob = new Blob([bytes], { type: 'audio/mp4' });
-        const file = new File(
-          [blob],
-          `record_native_${Date.now()}.m4a`,
-          { type: 'audio/mp4' }
-        );
+    const blob = new Blob([bytes], { type: 'audio/mp4' });
+    const file = new File(
+      [blob],
+      `record_native_${Date.now()}.m4a`,
+      { type: 'audio/mp4' }
+    );
 
-        resetRecordButton();
-        setStatus('loading', 'Transcribiendo grabación nativa…');
+    resetRecordButton();
+    setStatus('loading', 'Transcribiendo grabación nativa…');
 
-        await transcribeRecordedChunk(file);
-      } catch (err) {
-        console.error('[receiveNativeAudio]', err);
-        showToast('❌ Error al procesar audio nativo: ' + err.message);
-        resetRecordButton();
-        setStatus('error', 'Error al procesar audio nativo');
-      } finally {
-        isRecordingActive = false;
-        enableAllButtons();
+    await transcribeRecordedChunk(file);
+
+  } catch (err) {
+    console.error('[receiveNativeAudio]', err);
+
+    // 🔥 NUEVO — Detectar errores de red / conexión con Groq
+    const msg = (err && err.message) ? err.message : '';
+    const isNetworkError =
+      msg.includes('Error de red') ||
+      msg.includes('timeout') ||
+      msg.includes('Failed to fetch') ||
+      msg.includes('NetworkError') ||
+      msg.includes('Todas las') ||
+      msg.includes('todas las') ||
+      msg.includes('API Keys fallaron') ||
+      msg.includes('Load failed');
+
+    if (isNetworkError) {
+      // 1. Toast largo (8s) informando dónde está el archivo
+      showToast('⚠️ Sin conexión. Tu audio está guardado en Música > MeetingMind', 8000);
+
+      // 2. Status persistente en la barra superior
+      setStatus('error', '⚠️ Error de red — audio guardado en Música > MeetingMind');
+
+      // 3. Aviso persistente en la caja de transcripción
+      const box = document.getElementById('transcript-box');
+      if (box) {
+        const notice = document.createElement('div');
+        notice.className = 'transcript-error';
+        notice.innerHTML = `
+          <span class="err-title">⚠️ No se pudo transcribir por error de red</span>
+          <strong>Tu grabación NO se perdió.</strong> Está guardada permanentemente en:
+          <div class="err-detail">📁 Música › MeetingMind › MeetingMind_*.m4a</div>
+          Cuando recuperes la conexión, toca <strong>📂 Subir Audios</strong> y selecciona
+          el archivo desde esa carpeta para transcribirlo.
+        `;
+        box.appendChild(notice);
       }
-    };
+    } else {
+      // Errores no relacionados con red (formato inválido, etc.)
+      showToast('❌ Error al procesar audio nativo: ' + msg);
+      setStatus('error', 'Error al procesar audio nativo');
+    }
+
+    resetRecordButton();
+
+  } finally {
+    isRecordingActive = false;
+    enableAllButtons();
+  }
+};
 
     window.receiveNativeError = function (message) {
       showToast('❌ ' + (message || 'Error en grabación nativa'));
