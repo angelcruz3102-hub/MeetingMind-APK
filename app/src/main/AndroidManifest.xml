@@ -17,6 +17,12 @@
     <!-- Notificaciones (Android 13+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Escritura en almacenamiento público SOLO para Android 9 y anteriores.
+     En Android 10+ usamos MediaStore (que NO requiere este permiso). -->
+    <uses-permission
+    android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+    android:maxSdkVersion="28" />
+
     <!-- Mantener CPU despierta durante grabación -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
