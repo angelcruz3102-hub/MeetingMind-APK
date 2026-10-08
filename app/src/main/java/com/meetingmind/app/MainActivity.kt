@@ -4,12 +4,14 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.PermissionRequest
+import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -28,43 +30,72 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private val TAG = "MainActivity"
 
+    // 🔥 NUEVO — Referencia para el callback del selector de archivos
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+
     // ─── Permisos requeridos en runtime ──────────────────────────
-private val requiredPermissions: Array<String> = buildList {
-    add(Manifest.permission.RECORD_AUDIO)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        add(Manifest.permission.POST_NOTIFICATIONS)
-    }
-    // Android 9 y anteriores requieren permiso explícito para escribir en Music/
-    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-        add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-    }
-}.toTypedArray()
-
-   private val permLauncher = registerForActivityResult(
-    ActivityResultContracts.RequestMultiplePermissions()
-) { result ->
-    val micOk = (result[Manifest.permission.RECORD_AUDIO] ?: false) ||
-            (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                    == PackageManager.PERMISSION_GRANTED)
-
-    val storageOk = if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-        (result[Manifest.permission.WRITE_EXTERNAL_STORAGE] ?: false) ||
-                (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                        == PackageManager.PERMISSION_GRANTED)
-    } else true
-
-    if (micOk && storageOk) {
-        launchRecordingService()
-    } else {
-        val msg = when {
-            !micOk -> "Permiso de micrófono denegado"
-            !storageOk -> "Permiso de almacenamiento denegado"
-            else -> "Permisos insuficientes"
+    private val requiredPermissions: Array<String> = buildList {
+        add(Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
-        injectJs("window.receiveNativeError && window.receiveNativeError('$msg');")
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+            add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+    }.toTypedArray()
+
+    private val permLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val micOk = (result[Manifest.permission.RECORD_AUDIO] ?: false) ||
+                (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                        == PackageManager.PERMISSION_GRANTED)
+
+        val storageOk = if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+            (result[Manifest.permission.WRITE_EXTERNAL_STORAGE] ?: false) ||
+                    (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                            == PackageManager.PERMISSION_GRANTED)
+        } else true
+
+        if (micOk && storageOk) {
+            launchRecordingService()
+        } else {
+            val msg = when {
+                !micOk -> "Permiso de micrófono denegado"
+                !storageOk -> "Permiso de almacenamiento denegado"
+                else -> "Permisos insuficientes"
+            }
+            Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+            injectJs("window.receiveNativeError && window.receiveNativeError('$msg');")
+        }
     }
-}
+
+    // 🔥 NUEVO — Launcher del selector de archivos
+    private val filePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val callback = filePathCallback ?: return@registerForActivityResult
+        filePathCallback = null
+
+        if (result.resultCode != RESULT_OK) {
+            callback.onReceiveValue(null)
+            return@registerForActivityResult
+        }
+
+        val data = result.data
+        val uris: Array<Uri>? = when {
+            // Selección múltiple
+            data?.clipData != null -> {
+                val count = data.clipData!!.itemCount
+                Array(count) { i -> data.clipData!!.getItemAt(i).uri }
+            }
+            // Selección simple
+            data?.data != null -> arrayOf(data.data!!)
+            else -> null
+        }
+
+        callback.onReceiveValue(uris)
+    }
 
     // ─── Ciclo de vida ───────────────────────────────────────────
     @SuppressLint("SetJavaScriptEnabled")
@@ -80,13 +111,11 @@ private val requiredPermissions: Array<String> = buildList {
         }
         setContentView(webView)
 
-        // Callback que RecordingService usará para devolvernos el audio
         RecordingBridge.onAudioReady = { base64 -> sendAudioToWeb(base64) }
         RecordingBridge.onRecordingStopped = {
             runOnUiThread { Log.d(TAG, "Servicio de grabación detenido.") }
         }
 
-        // ─── WebViewAssetLoader (CORS-friendly) ────────────────
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
             .build()
@@ -126,16 +155,46 @@ private val requiredPermissions: Array<String> = buildList {
             }
         }
 
+        // ═══════════════════════════════════════════════════════
+        // 🔥 WebChromeClient CON SOPORTE PARA <input type="file">
+        // ═══════════════════════════════════════════════════════
         webView.webChromeClient = object : WebChromeClient() {
+
+            // Permite getUserMedia si se usa el modo web
             override fun onPermissionRequest(request: PermissionRequest) {
                 request.grant(request.resources)
+            }
+
+            // 🔥 CLAVE: abrir el selector de archivos nativo
+            override fun onShowFileChooser(
+                webView: WebView?,
+                filePathCallback: ValueCallback<Array<Uri>>?,
+                fileChooserParams: FileChooserParams?
+            ): Boolean {
+                // Cancelar cualquier picker pendiente
+                this@MainActivity.filePathCallback?.onReceiveValue(null)
+                this@MainActivity.filePathCallback = filePathCallback
+
+                return try {
+                    val intent = fileChooserParams?.createIntent()
+                    if (intent == null) {
+                        this@MainActivity.filePathCallback = null
+                        return false
+                    }
+                    // El HTML ya define los mime types en el atributo `accept`
+                    filePickerLauncher.launch(intent)
+                    true
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error abriendo file chooser", e)
+                    this@MainActivity.filePathCallback = null
+                    false
+                }
             }
         }
 
         // ─── Puente nativo "AndroidNative" ─────────────────────
         webView.addJavascriptInterface(WebAppInterface(), "AndroidNative")
 
-        // ─── Cargar HTML desde el asset loader ─────────────────
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
     }
 
@@ -163,7 +222,6 @@ private val requiredPermissions: Array<String> = buildList {
         }
     }
 
-    // ─── Permisos + arranque del servicio ────────────────────────
     private fun checkAndStartRecording() {
         val missing = requiredPermissions.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
@@ -193,20 +251,17 @@ private val requiredPermissions: Array<String> = buildList {
         startService(intent)
     }
 
-    // ─── Envío del audio en Base64 al WebView (en chunks) ───────
     private fun sendAudioToWeb(base64Audio: String) {
         runOnUiThread {
             val total = base64Audio.length
             val chunkSize = 400_000
             Log.d(TAG, "Enviando ${total} chars Base64 al WebView")
 
-            // 1. Inicializar buffer
             webView.evaluateJavascript(
                 "window.__nativeAudioBuffer = ''; window.__nativeAudioExpected = $total;",
                 null
             )
 
-            // 2. Enviar por trozos
             var offset = 0
             while (offset < total) {
                 val end = minOf(offset + chunkSize, total)
@@ -216,7 +271,6 @@ private val requiredPermissions: Array<String> = buildList {
                 offset = end
             }
 
-            // 3. Disparar callback en el HTML
             webView.evaluateJavascript(
                 """
                 (function(){
@@ -239,6 +293,8 @@ private val requiredPermissions: Array<String> = buildList {
     override fun onDestroy() {
         RecordingBridge.onAudioReady = null
         RecordingBridge.onRecordingStopped = null
+        filePathCallback?.onReceiveValue(null)
+        filePathCallback = null
         webView.destroy()
         super.onDestroy()
     }
