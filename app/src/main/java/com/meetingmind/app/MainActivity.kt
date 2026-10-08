@@ -29,28 +29,42 @@ class MainActivity : AppCompatActivity() {
     private val TAG = "MainActivity"
 
     // ─── Permisos requeridos en runtime ──────────────────────────
-    private val requiredPermissions: Array<String> = buildList {
-        add(Manifest.permission.RECORD_AUDIO)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-    }.toTypedArray()
-
-    private val permLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { result ->
-        // 🔧 FIX: paréntesis explícitos + Elvis para evitar conflicto de tipos
-        val micOk = (result[Manifest.permission.RECORD_AUDIO] ?: false) ||
-                (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-                        == PackageManager.PERMISSION_GRANTED)
-
-        if (micOk) {
-            launchRecordingService()
-        } else {
-            Toast.makeText(this, "Permiso de micrófono denegado", Toast.LENGTH_LONG).show()
-            injectJs("window.receiveNativeError && window.receiveNativeError('Permiso de micrófono denegado');")
-        }
+private val requiredPermissions: Array<String> = buildList {
+    add(Manifest.permission.RECORD_AUDIO)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        add(Manifest.permission.POST_NOTIFICATIONS)
     }
+    // Android 9 y anteriores requieren permiso explícito para escribir en Music/
+    if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+        add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    }
+}.toTypedArray()
+
+   private val permLauncher = registerForActivityResult(
+    ActivityResultContracts.RequestMultiplePermissions()
+) { result ->
+    val micOk = (result[Manifest.permission.RECORD_AUDIO] ?: false) ||
+            (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+                    == PackageManager.PERMISSION_GRANTED)
+
+    val storageOk = if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+        (result[Manifest.permission.WRITE_EXTERNAL_STORAGE] ?: false) ||
+                (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        == PackageManager.PERMISSION_GRANTED)
+    } else true
+
+    if (micOk && storageOk) {
+        launchRecordingService()
+    } else {
+        val msg = when {
+            !micOk -> "Permiso de micrófono denegado"
+            !storageOk -> "Permiso de almacenamiento denegado"
+            else -> "Permisos insuficientes"
+        }
+        Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+        injectJs("window.receiveNativeError && window.receiveNativeError('$msg');")
+    }
+}
 
     // ─── Ciclo de vida ───────────────────────────────────────────
     @SuppressLint("SetJavaScriptEnabled")
