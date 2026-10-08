@@ -964,15 +964,16 @@
     }
     #toast.show { transform: translateX(-50%) translateY(0); }
 
-    #file-input, #import-file {
-      position: absolute;
-      left: -9999px;
-      top: -9999px;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
-      pointer-events: none;
-    }
+#file-input, #import-file {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  z-index: -1;
+}
 
     /* ══════════ DIAGNÓSTICO + ERRORES VISIBLES ══════════ */
     .diag-result {
@@ -1591,10 +1592,17 @@
         else startRecordingProcess();
       });
 
-      btnUpload.addEventListener('click', () => {
-        if (isRecordingActive) { showToast('Detén la grabación primero.'); return; }
-        fileInput.click();
-      });
+btnUpload.addEventListener('click', () => {
+  if (isRecordingActive) { showToast('Detén la grabación primero.'); return; }
+  setStatus('loading', 'Abriendo selector de archivos…');
+  fileInput.click();
+  // Restaurar estado tras un delay breve (el onchange del input lo sobreescribirá)
+  setTimeout(() => {
+    if (!isRecordingActive && !globalTranscriptionController) {
+      setStatus('idle', 'Listo. Sube o graba un audio.');
+    }
+  }, 1500);
+});
 
       btnAnalyze.addEventListener('click', () => {
         if (!accumulatedTranscript.trim()) { showToast('⚠️ No hay transcripción disponible.'); return; }
