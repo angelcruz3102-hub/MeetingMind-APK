@@ -257,7 +257,6 @@
 
   <div id="config-panel">
 
-    <!-- 🔮 Gemini: Motor de Notas Inteligentes -->
     <label for="gemini-model-select">Modelo de Notas Inteligentes (Gemini)</label>
     <select id="gemini-model-select">
       <option value="gemini-1.5-flash">✨ gemini-1.5-flash (rápido, recomendado)</option>
@@ -269,11 +268,13 @@
     <div class="key-divider">
       <label>🔮 Gemini API Key (para Notas Inteligentes)</label>
       <p style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;line-height:1.5;">
-        Consigue tu key gratis en <strong>aistudio.google.com/app/apikey</strong>. Empieza por <code style="background:rgba(135,131,120,0.15);padding:1px 5px;border-radius:3px;">AIza</code>.
+        Consigue tu key gratis en <strong>aistudio.google.com/app/apikey</strong>.
+        Puede empezar por <code style="background:rgba(135,131,120,0.15);padding:1px 5px;border-radius:3px;">AIza</code>
+        o por <code style="background:rgba(135,131,120,0.15);padding:1px 5px;border-radius:3px;">AQ.</code>.
         Se guarda localmente y <strong>persiste entre actualizaciones del APK</strong>.
       </p>
       <input type="password" id="gemini-key-input"
-             placeholder="AIzaSy..."
+             placeholder="AIzaSy... o AQ.Ab8..."
              spellcheck="false"
              autocapitalize="off"
              autocomplete="off"
@@ -447,6 +448,7 @@
     // 🔮 GEMINI — Configuración para Notas Inteligentes
     // ═══════════════════════════════════════════════════════════════
     // ⚠️ REEMPLAZA EL VALOR DE ABAJO POR TU API KEY REAL DE GEMINI
+    //    (puede empezar por "AIza" o por "AQ.")
     const GEMINI_API_KEY_DEFAULT = 'PEGA_AQUI_TU_API_KEY_DE_GEMINI';
 
     const LS_KEY_GEMINI_API = 'meetingmind_gemini_api_key';
@@ -454,25 +456,39 @@
 
     const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
+    /* 🔥 FIX — Validación dual: acepta prefijo "AIza" (formato antiguo) Y "AQ." (formato nuevo) */
     function isValidGeminiKey(k) {
-      return typeof k === 'string' && k.trim().startsWith('AIza') && k.trim().length > 20;
+      if (typeof k !== 'string') return false;
+      const trimmed = k.trim();
+      if (trimmed.length < 20) return false;
+      return trimmed.startsWith('AIza') || trimmed.startsWith('AQ.');
     }
 
+    /* 🔥 FIX — Limpieza al cargar desde localStorage */
     function loadGeminiKey() {
       try {
         const stored = localStorage.getItem(LS_KEY_GEMINI_API);
-        if (isValidGeminiKey(stored)) return stored.trim();
+        if (stored) {
+          const cleaned = stored.trim();
+          if (isValidGeminiKey(cleaned)) return cleaned;
+        }
       } catch (e) {}
       return GEMINI_API_KEY_DEFAULT;
     }
 
     let GEMINI_API_KEY = loadGeminiKey();
 
+    /* 🔥 FIX — Guardado con trim() y validación dual (AIza o AQ.) */
     function saveGeminiKey(key) {
       const cleaned = (key || '').trim();
+
       if (!isValidGeminiKey(cleaned)) {
-        return { ok: false, error: 'La key debe empezar por "AIza" y tener al menos 20 caracteres.' };
+        return {
+          ok: false,
+          error: 'La key debe empezar por "AIza" o "AQ." y tener al menos 20 caracteres.'
+        };
       }
+
       try {
         localStorage.setItem(LS_KEY_GEMINI_API, cleaned);
         GEMINI_API_KEY = cleaned;
@@ -696,9 +712,11 @@
       // ── Gemini: UI de API key y modelo ──
       const geminiKeyInput = document.getElementById('gemini-key-input');
       const geminiKeyStatus = document.getElementById('gemini-key-status');
-      geminiKeyInput.value = (GEMINI_API_KEY === GEMINI_API_KEY_DEFAULT || !GEMINI_API_KEY) ? '' : GEMINI_API_KEY;
+      // Mostramos la key guardada solo si es diferente al placeholder
+      geminiKeyInput.value = (GEMINI_API_KEY && GEMINI_API_KEY !== GEMINI_API_KEY_DEFAULT && isValidGeminiKey(GEMINI_API_KEY))
+        ? GEMINI_API_KEY
+        : '';
 
-      // Modelo guardado
       const savedModel = memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-1.5-flash';
       if ([...geminiModelSelect.options].some(o => o.value === savedModel)) {
         geminiModelSelect.value = savedModel;
@@ -730,7 +748,9 @@
             contents: [{ parts: [{ text: 'Responde con el JSON: {"ok": true}' }] }],
             generationConfig: { responseMimeType: 'application/json', temperature: 0 }
           };
-          const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${GEMINI_API_KEY}`;
+          // 🔥 FIX — trim() aplicado a la key antes de la URL
+          const apiKeyClean = String(GEMINI_API_KEY || '').trim();
+          const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKeyClean}`;
           const res = await fetchWithTimeout(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1615,15 +1635,19 @@ REGLAS ESPECIALES:
     }
 
     // ═══════════════════ 🔮 GEMINI CALL ═══════════════════
+    /* 🔥 FIX — Gemini call con key.trim() en la URL */
     async function callGemini(systemPrompt, userContent, timeoutMs) {
-      const apiKey = GEMINI_API_KEY;
+      // 🔥 FIX — Aplicamos .trim() ANTES de cualquier uso
+      const apiKey = String(GEMINI_API_KEY || '').trim();
 
       if (!isValidGeminiKey(apiKey)) {
-        throw new Error('Gemini API Key no configurada. Ve a ⚙️ Configuración → 🔮 Gemini API Key y pega tu key (empieza por "AIza").');
+        throw new Error('Gemini API Key no configurada o inválida. Ve a ⚙️ Configuración → 🔮 Gemini API Key y pega tu key (AIza… o AQ.…).');
       }
 
-      const model = memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-1.5-flash';
-      const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`;
+      const model = (memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-1.5-flash').trim();
+
+      // 🔥 FIX — URL con apiKey.trim() explícito
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
 
       const payload = {
         contents: [{
@@ -1646,7 +1670,6 @@ REGLAS ESPECIALES:
         const data = await response.json();
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text) return text;
-        // A veces Gemini devuelve la respuesta bloqueada
         const reason = data?.candidates?.[0]?.finishReason;
         if (reason) throw new Error(`Gemini no devolvió texto (finishReason: ${reason}).`);
         throw new Error('Respuesta vacía de Gemini.');
@@ -1659,8 +1682,9 @@ REGLAS ESPECIALES:
       } catch (_) {}
 
       if (response.status === 400) {
+        // 🔥 FIX — Mensaje más claro diferenciando los dos formatos de key
         if (errMsg.toLowerCase().includes('api key') || errMsg.toLowerCase().includes('api_key')) {
-          throw new Error('Gemini API Key inválida o malformada.');
+          throw new Error('Gemini API Key inválida. Revisa que sea correcta (AIza… o AQ.…) y que no tenga espacios.');
         }
         throw new Error(`Solicitud inválida a Gemini: ${errMsg}`);
       }
