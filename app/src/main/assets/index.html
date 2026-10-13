@@ -55,7 +55,7 @@
       padding: 20px 14px calc(40px + var(--safe-bottom));
       -webkit-user-select: none;
       user-select: none;
-      touch-action: pan-y; /* 🔧 FIX SCROLL — era manipulation */
+      touch-action: pan-y;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
@@ -444,50 +444,18 @@
     .notion-content > *:first-child { margin-top: 0 !important; }
     .notion-content > *:last-child { margin-bottom: 0 !important; }
 
-    .notion-content h1 {
-      font-size: 1.9em;
-      font-weight: 700;
-      margin: 0.3em 0 0.4em;
-      letter-spacing: -0.02em;
-      color: #37352f;
-    }
-    .notion-content h2 {
-      font-size: 1.4em;
-      font-weight: 600;
-      margin: 1.4em 0 0.5em;
-      color: #37352f;
-    }
-    .notion-content h3 {
-      font-size: 1.15em;
-      font-weight: 600;
-      margin: 1.2em 0 0.4em;
-      color: #37352f;
-    }
-    .notion-content h4 {
-      font-size: 1em;
-      font-weight: 600;
-      margin: 1em 0 0.3em;
-      color: #787774;
-    }
+    .notion-content h1 { font-size: 1.9em; font-weight: 700; margin: 0.3em 0 0.4em; letter-spacing: -0.02em; color: #37352f; }
+    .notion-content h2 { font-size: 1.4em; font-weight: 600; margin: 1.4em 0 0.5em; color: #37352f; }
+    .notion-content h3 { font-size: 1.15em; font-weight: 600; margin: 1.2em 0 0.4em; color: #37352f; }
+    .notion-content h4 { font-size: 1em; font-weight: 600; margin: 1em 0 0.3em; color: #787774; }
     .notion-content p { margin: 0.6em 0; color: #37352f; }
     .notion-content ul,
-    .notion-content ol {
-      margin: 0.5em 0 0.7em;
-      padding-left: 1.6em;
-    }
-    .notion-content li {
-      margin: 0.25em 0;
-      padding-left: 0.15em;
-    }
+    .notion-content ol { margin: 0.5em 0 0.7em; padding-left: 1.6em; }
+    .notion-content li { margin: 0.25em 0; padding-left: 0.15em; }
     .notion-content li::marker { color: #b7b6b4; }
     .notion-content strong { font-weight: 600; }
     .notion-content em { font-style: italic; }
-    .notion-content a {
-      color: inherit;
-      text-decoration: underline;
-      text-decoration-color: rgba(55, 53, 47, 0.4);
-      text-underline-offset: 2px;
-    }
+    .notion-content a { color: inherit; text-decoration: underline; text-decoration-color: rgba(55, 53, 47, 0.4); text-underline-offset: 2px; }
     .notion-content code {
       background: rgba(135, 131, 120, 0.15);
       color: #eb5757;
@@ -508,23 +476,14 @@
       line-height: 1.5;
       -webkit-overflow-scrolling: touch;
     }
-    .notion-content pre code {
-      background: none;
-      color: inherit;
-      padding: 0;
-      font-size: inherit;
-    }
+    .notion-content pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
     .notion-content blockquote {
       margin: 0.8em 0;
       padding: 2px 0 2px 14px;
       border-left: 3px solid #37352f;
       color: #37352f;
     }
-    .notion-content hr {
-      border: none;
-      border-top: 1px solid #e9e9e7;
-      margin: 1.4em 0;
-    }
+    .notion-content hr { border: none; border-top: 1px solid #e9e9e7; margin: 1.4em 0; }
 
     .notion-content ul.notion-checklist,
     .notion-content ul:has(> li > input[type="checkbox"]) {
@@ -556,10 +515,7 @@
       outline: none;
     }
     .notion-content input.notion-checkbox:active { transform: scale(0.9); }
-    .notion-content input.notion-checkbox:checked {
-      background: #2383e2;
-      border-color: #2383e2;
-    }
+    .notion-content input.notion-checkbox:checked { background: #2383e2; border-color: #2383e2; }
     .notion-content input.notion-checkbox:checked::after {
       content: '';
       position: absolute;
@@ -571,22 +527,14 @@
       border-width: 0 2px 2px 0;
       transform: rotate(45deg);
     }
-    .notion-content li.notion-check-item .notion-check-text {
-      flex: 1;
-      transition: color 0.15s;
-    }
+    .notion-content li.notion-check-item .notion-check-text { flex: 1; transition: color 0.15s; }
     .notion-content li.notion-check-item.notion-checked .notion-check-text {
       color: #9b9a97;
       text-decoration: line-through;
       text-decoration-color: #c4c4c2;
     }
 
-    .proyectos-create-row {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
+    .proyectos-create-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
     .proyectos-create-row input {
       flex: 1;
       min-width: 150px;
@@ -614,11 +562,7 @@
     }
     .proyectos-create-row button:active { background: var(--accent-h); }
 
-    .proyectos-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-      gap: 12px;
-    }
+    .proyectos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
     .proyecto-card {
       background: var(--bg);
       border: 2px solid var(--border);
@@ -739,17 +683,8 @@
       align-items: center;
       gap: 8px;
     }
-    .modal-subtitle {
-      font-size: 0.82rem;
-      color: var(--muted);
-      margin-bottom: 18px;
-      line-height: 1.5;
-    }
-    .modal-box .modal-content {
-      font-size: 0.9rem;
-      line-height: 1.7;
-      color: var(--text);
-    }
+    .modal-subtitle { font-size: 0.82rem; color: var(--muted); margin-bottom: 18px; line-height: 1.5; }
+    .modal-box .modal-content { font-size: 0.9rem; line-height: 1.7; color: var(--text); }
     .btn-close-modal {
       margin-top: 16px;
       width: 100%;
@@ -766,10 +701,7 @@
     .btn-close-modal:active { border-color: var(--accent); color: var(--accent); }
 
     .prompt-modal-box { max-width: 560px; }
-    .prompt-step {
-      margin-bottom: 20px;
-      animation: fadeSlide 0.25s ease;
-    }
+    .prompt-step { margin-bottom: 20px; animation: fadeSlide 0.25s ease; }
     .prompt-step-label {
       display: flex;
       align-items: center;
@@ -794,11 +726,7 @@
       font-weight: 800;
       flex-shrink: 0;
     }
-    .prompt-cat-chips {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 10px;
-    }
+    .prompt-cat-chips { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
     .prompt-cat-chip {
       background: var(--bg);
       border: 2px solid var(--border);
@@ -825,11 +753,7 @@
     }
     .prompt-cat-chip .cat-emoji { font-size: 1.2rem; }
 
-    .prompt-check-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 8px;
-    }
+    .prompt-check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
     .prompt-check {
       background: var(--bg);
       border: 2px solid var(--border);
@@ -861,14 +785,8 @@
       justify-content: center;
       transition: all 0.15s;
     }
-    .prompt-check:has(input:checked) {
-      border-color: var(--accent);
-      background: rgba(255, 122, 0, 0.08);
-    }
-    .prompt-check:has(input:checked) .prompt-check-box {
-      background: var(--accent);
-      border-color: var(--accent);
-    }
+    .prompt-check:has(input:checked) { border-color: var(--accent); background: rgba(255, 122, 0, 0.08); }
+    .prompt-check:has(input:checked) .prompt-check-box { background: var(--accent); border-color: var(--accent); }
     .prompt-check:has(input:checked) .prompt-check-box::after {
       content: '';
       width: 4px;
@@ -923,10 +841,7 @@
       flex: 0 0 auto;
       min-width: 100px;
     }
-    .prompt-btn-secondary:active {
-      border-color: var(--accent);
-      color: var(--text);
-    }
+    .prompt-btn-secondary:active { border-color: var(--accent); color: var(--text); }
 
     .state-msg {
       display: flex;
@@ -964,18 +879,18 @@
     }
     #toast.show { transform: translateX(-50%) translateY(0); }
 
-#file-input, #import-file {
-  position: absolute;
-  left: -9999px;
-  top: -9999px;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  overflow: hidden;
-  z-index: -1;
-}
+    /* 🔧 FIX FILE INPUT — removido pointer-events:none (bloqueaba .click() en WebView) */
+    #file-input, #import-file {
+      position: absolute;
+      left: -9999px;
+      top: -9999px;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+      overflow: hidden;
+      z-index: -1;
+    }
 
-    /* ══════════ DIAGNÓSTICO + ERRORES VISIBLES ══════════ */
     .diag-result {
       font-size: 0.78rem;
       line-height: 1.5;
@@ -986,16 +901,8 @@
       white-space: pre-wrap;
       word-break: break-word;
     }
-    .diag-result.ok {
-      background: rgba(76, 175, 80, 0.1);
-      border: 1px solid var(--success);
-      color: var(--success);
-    }
-    .diag-result.fail {
-      background: rgba(255, 92, 92, 0.1);
-      border: 1px solid var(--error);
-      color: var(--error);
-    }
+    .diag-result.ok { background: rgba(76, 175, 80, 0.1); border: 1px solid var(--success); color: var(--success); }
+    .diag-result.fail { background: rgba(255, 92, 92, 0.1); border: 1px solid var(--error); color: var(--error); }
 
     .transcript-progress {
       background: rgba(245, 166, 35, 0.08);
@@ -1033,11 +940,7 @@
       line-height: 1.5;
       word-break: break-word;
     }
-    .transcript-error .err-title {
-      font-weight: 700;
-      display: block;
-      margin-bottom: 6px;
-    }
+    .transcript-error .err-title { font-weight: 700; display: block; margin-bottom: 6px; }
     .transcript-error .err-detail {
       font-family: monospace;
       font-size: 0.72rem;
@@ -1117,7 +1020,7 @@
         Pega una key por línea. Deben empezar por <code style="background:rgba(135,131,120,0.15);padding:1px 5px;border-radius:3px;">gsk_</code>.
         Se guardan localmente en este dispositivo y <strong>persisten entre actualizaciones del APK</strong>.
       </p>
-      <textarea id="groq-keys-input" 
+      <textarea id="groq-keys-input"
                 placeholder="gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&#10;gsk_yyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
                 spellcheck="false"
                 autocapitalize="off"
@@ -1213,9 +1116,20 @@
           <button type="button" class="prompt-cat-chip" data-cat="libre">
             <span class="cat-emoji">📝</span> Libre
           </button>
-          <button type="button" class="prompt-cat-chip" data-cat="idiomas">
-            <span class="cat-emoji">🌐</span> Idiomas
-          </button>
+        </div>
+
+        <div id="language-focus-wrapper" style="display:none; margin-top:12px;">
+          <label class="prompt-check" style="width:100%;">
+            <input type="checkbox" id="language-focus-toggle">
+            <span class="prompt-check-box"></span>
+            <span class="prompt-check-label">
+              🌐 Enfoque en Clase de Idiomas / Aprendizaje
+            </span>
+          </label>
+          <div style="font-size:0.72rem; color:var(--muted); margin-top:6px; line-height:1.5;">
+            Actívalo si la clase es de un idioma (inglés, francés, etc.). La IA corregirá
+            pronunciación, vocabulario y gramática, y estructurará las notas como guía de estudio del idioma.
+          </div>
         </div>
       </div>
 
@@ -1326,6 +1240,7 @@
     const LS_KEY_MODE = 'meetingmind_analysis_mode';
     const LS_KEY_CHECKBOX = 'meetingmind_notion_checkboxes';
 
+    // ═══════════ Categorías (idiomas ahora es sub-opción de académico) ═══════════
     const PROMPT_CATEGORIES = {
       academico: {
         label: 'Académico',
@@ -1371,20 +1286,6 @@
           { value: 'Citas Destacadas', label: 'Citas Destacadas', emoji: '💭' },
           { value: 'Ideas Principales', label: 'Ideas Principales', emoji: '💡' }
         ]
-      },
-      idiomas: {
-        label: 'Idiomas',
-        emoji: '🌐',
-        context: [
-          { value: 'Clase de Idioma', label: 'Clase de Idioma', emoji: '📚' },
-          { value: 'Práctica Oral', label: 'Práctica Oral', emoji: '🗣️' },
-          { value: 'Conversación Nativa', label: 'Conversación Nativa', emoji: '🌍' }
-        ],
-        focus: [
-          { value: 'Vocabulario Nuevo', label: 'Vocabulario Nuevo', emoji: '📖' },
-          { value: 'Gramática', label: 'Gramática', emoji: '✏️' },
-          { value: 'Pronunciación', label: 'Pronunciación', emoji: '🔊' }
-        ]
       }
     };
 
@@ -1429,14 +1330,14 @@
     }
 
     function showToast(msg, durationMs) {
-  const t = document.getElementById('toast');
-  if (!t) return;
-  const dur = (typeof durationMs === 'number' && durationMs > 0) ? durationMs : 3000;
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(showToast._timer);
-  showToast._timer = setTimeout(() => t.classList.remove('show'), dur);
-}
+      const t = document.getElementById('toast');
+      if (!t) return;
+      const dur = (typeof durationMs === 'number' && durationMs > 0) ? durationMs : 3000;
+      t.textContent = msg;
+      t.classList.add('show');
+      clearTimeout(showToast._timer);
+      showToast._timer = setTimeout(() => t.classList.remove('show'), dur);
+    }
 
     function setStatus(type, text) {
       const dot = document.getElementById('status-dot');
@@ -1505,7 +1406,8 @@
     let promptModalState = {
       categoria: null,
       contexto: [],
-      enfoque: []
+      enfoque: [],
+      isLanguageFocus: false
     };
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -1592,17 +1494,16 @@
         else startRecordingProcess();
       });
 
-btnUpload.addEventListener('click', () => {
-  if (isRecordingActive) { showToast('Detén la grabación primero.'); return; }
-  setStatus('loading', 'Abriendo selector de archivos…');
-  fileInput.click();
-  // Restaurar estado tras un delay breve (el onchange del input lo sobreescribirá)
-  setTimeout(() => {
-    if (!isRecordingActive && !globalTranscriptionController) {
-      setStatus('idle', 'Listo. Sube o graba un audio.');
-    }
-  }, 1500);
-});
+      btnUpload.addEventListener('click', () => {
+        if (isRecordingActive) { showToast('Detén la grabación primero.'); return; }
+        setStatus('loading', 'Abriendo selector de archivos…');
+        fileInput.click();
+        setTimeout(() => {
+          if (!isRecordingActive && !globalTranscriptionController) {
+            setStatus('idle', 'Listo. Sube o graba un audio.');
+          }
+        }, 1500);
+      });
 
       btnAnalyze.addEventListener('click', () => {
         if (!accumulatedTranscript.trim()) { showToast('⚠️ No hay transcripción disponible.'); return; }
@@ -1648,7 +1549,6 @@ btnUpload.addEventListener('click', () => {
       });
 
       initPromptModalListeners();
-
       renderProjectsTab();
 
       document.getElementById('btn-export-data').addEventListener('click', () => {
@@ -1750,8 +1650,25 @@ btnUpload.addEventListener('click', () => {
           chips.forEach(c => c.classList.toggle('selected', c === chip));
           renderPromptChecklists(cat);
           updatePromptProcessButton();
+
+          const langWrapper = document.getElementById('language-focus-wrapper');
+          const langToggle = document.getElementById('language-focus-toggle');
+          if (cat === 'academico') {
+            if (langWrapper) langWrapper.style.display = 'block';
+          } else {
+            if (langWrapper) langWrapper.style.display = 'none';
+            if (langToggle) langToggle.checked = false;
+            promptModalState.isLanguageFocus = false;
+          }
         });
       });
+
+      const langToggle = document.getElementById('language-focus-toggle');
+      if (langToggle) {
+        langToggle.addEventListener('change', () => {
+          promptModalState.isLanguageFocus = !!langToggle.checked;
+        });
+      }
 
       btnCancel.addEventListener('click', closePromptModal);
       modal.addEventListener('click', (e) => {
@@ -1766,7 +1683,8 @@ btnUpload.addEventListener('click', () => {
           categoria: promptModalState.categoria,
           categoriaLabel: PROMPT_CATEGORIES[promptModalState.categoria].label,
           contexto: [...promptModalState.contexto],
-          enfoque: [...promptModalState.enfoque]
+          enfoque: [...promptModalState.enfoque],
+          isLanguageFocus: promptModalState.isLanguageFocus === true
         };
         closePromptModal();
         analyzeText(accumulatedTranscript.trim(), document.getElementById('notes-container'), opts);
@@ -1774,13 +1692,19 @@ btnUpload.addEventListener('click', () => {
     }
 
     function openPromptModal() {
-      promptModalState = { categoria: null, contexto: [], enfoque: [] };
+      promptModalState = { categoria: null, contexto: [], enfoque: [], isLanguageFocus: false };
       document.querySelectorAll('#prompt-cat-chips .prompt-cat-chip').forEach(c => c.classList.remove('selected'));
       document.getElementById('prompt-context-grid').innerHTML = '';
       document.getElementById('prompt-focus-grid').innerHTML = '';
       document.getElementById('prompt-context-step').style.display = 'none';
       document.getElementById('prompt-focus-step').style.display = 'none';
       document.getElementById('prompt-process').disabled = true;
+
+      const langWrapper = document.getElementById('language-focus-wrapper');
+      const langToggle = document.getElementById('language-focus-toggle');
+      if (langWrapper) langWrapper.style.display = 'none';
+      if (langToggle) langToggle.checked = false;
+
       document.getElementById('prompt-modal').classList.add('open');
     }
 
@@ -1845,6 +1769,7 @@ btnUpload.addEventListener('click', () => {
       btn.disabled = !ok;
     }
 
+    // ═══════════════════ GRABACIÓN ═══════════════════
     async function startRecordingProcess() {
       if (isRecordingActive) return;
 
@@ -1964,81 +1889,75 @@ btnUpload.addEventListener('click', () => {
     }
 
     window.receiveNativeAudio = async function (base64Audio) {
-  try {
-    if (!base64Audio || typeof base64Audio !== 'string' || base64Audio.length < 10) {
-      throw new Error('Audio nativo vacío o inválido.');
-    }
+      try {
+        if (!base64Audio || typeof base64Audio !== 'string' || base64Audio.length < 10) {
+          throw new Error('Audio nativo vacío o inválido.');
+        }
 
-    const cleanB64 = base64Audio.includes(',')
-      ? base64Audio.split(',').pop()
-      : base64Audio;
+        const cleanB64 = base64Audio.includes(',')
+          ? base64Audio.split(',').pop()
+          : base64Audio;
 
-    const binary = atob(cleanB64);
-    const len = binary.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
+        const binary = atob(cleanB64);
+        const len = binary.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
 
-    const blob = new Blob([bytes], { type: 'audio/mp4' });
-    const file = new File(
-      [blob],
-      `record_native_${Date.now()}.m4a`,
-      { type: 'audio/mp4' }
-    );
+        const blob = new Blob([bytes], { type: 'audio/mp4' });
+        const file = new File(
+          [blob],
+          `record_native_${Date.now()}.m4a`,
+          { type: 'audio/mp4' }
+        );
 
-    resetRecordButton();
-    setStatus('loading', 'Transcribiendo grabación nativa…');
+        resetRecordButton();
+        setStatus('loading', 'Transcribiendo grabación nativa…');
 
-    await transcribeRecordedChunk(file);
+        await transcribeRecordedChunk(file);
 
-  } catch (err) {
-    console.error('[receiveNativeAudio]', err);
+      } catch (err) {
+        console.error('[receiveNativeAudio]', err);
 
-    // 🔥 NUEVO — Detectar errores de red / conexión con Groq
-    const msg = (err && err.message) ? err.message : '';
-    const isNetworkError =
-      msg.includes('Error de red') ||
-      msg.includes('timeout') ||
-      msg.includes('Failed to fetch') ||
-      msg.includes('NetworkError') ||
-      msg.includes('Todas las') ||
-      msg.includes('todas las') ||
-      msg.includes('API Keys fallaron') ||
-      msg.includes('Load failed');
+        const msg = (err && err.message) ? err.message : '';
+        const isNetworkError =
+          msg.includes('Error de red') ||
+          msg.includes('timeout') ||
+          msg.includes('Failed to fetch') ||
+          msg.includes('NetworkError') ||
+          msg.includes('Todas las') ||
+          msg.includes('todas las') ||
+          msg.includes('API Keys fallaron') ||
+          msg.includes('Load failed');
 
-    if (isNetworkError) {
-      // 1. Toast largo (8s) informando dónde está el archivo
-      showToast('⚠️ Sin conexión. Tu audio está guardado en Música > MeetingMind', 8000);
+        if (isNetworkError) {
+          showToast('⚠️ Sin conexión. Tu audio está guardado en Música > MeetingMind', 8000);
+          setStatus('error', '⚠️ Error de red — audio guardado en Música > MeetingMind');
 
-      // 2. Status persistente en la barra superior
-      setStatus('error', '⚠️ Error de red — audio guardado en Música > MeetingMind');
+          const box = document.getElementById('transcript-box');
+          if (box) {
+            const notice = document.createElement('div');
+            notice.className = 'transcript-error';
+            notice.innerHTML = `
+              <span class="err-title">⚠️ No se pudo transcribir por error de red</span>
+              <strong>Tu grabación NO se perdió.</strong> Está guardada permanentemente en:
+              <div class="err-detail">📁 Música › MeetingMind › MeetingMind_*.m4a</div>
+              Cuando recuperes la conexión, toca <strong>📂 Subir Audios</strong> y selecciona
+              el archivo desde esa carpeta para transcribirlo.
+            `;
+            box.appendChild(notice);
+          }
+        } else {
+          showToast('❌ Error al procesar audio nativo: ' + msg);
+          setStatus('error', 'Error al procesar audio nativo');
+        }
 
-      // 3. Aviso persistente en la caja de transcripción
-      const box = document.getElementById('transcript-box');
-      if (box) {
-        const notice = document.createElement('div');
-        notice.className = 'transcript-error';
-        notice.innerHTML = `
-          <span class="err-title">⚠️ No se pudo transcribir por error de red</span>
-          <strong>Tu grabación NO se perdió.</strong> Está guardada permanentemente en:
-          <div class="err-detail">📁 Música › MeetingMind › MeetingMind_*.m4a</div>
-          Cuando recuperes la conexión, toca <strong>📂 Subir Audios</strong> y selecciona
-          el archivo desde esa carpeta para transcribirlo.
-        `;
-        box.appendChild(notice);
+        resetRecordButton();
+
+      } finally {
+        isRecordingActive = false;
+        enableAllButtons();
       }
-    } else {
-      // Errores no relacionados con red (formato inválido, etc.)
-      showToast('❌ Error al procesar audio nativo: ' + msg);
-      setStatus('error', 'Error al procesar audio nativo');
-    }
-
-    resetRecordButton();
-
-  } finally {
-    isRecordingActive = false;
-    enableAllButtons();
-  }
-};
+    };
 
     window.receiveNativeError = function (message) {
       showToast('❌ ' + (message || 'Error en grabación nativa'));
@@ -2053,6 +1972,7 @@ btnUpload.addEventListener('click', () => {
       document.getElementById('btn-clear').style.display = 'block';
     }
 
+    // ═══════════════════ TRANSCRIPCIÓN MÚLTIPLE ═══════════════════
     async function handleMultipleAudioFiles(files, box) {
       disableAllButtons();
       if (!accumulatedTranscript.trim()) box.textContent = '';
@@ -2261,86 +2181,245 @@ btnUpload.addEventListener('click', () => {
       throw new Error(`Todas las ${GROQ_KEYS.length} API Keys fallaron. Último: ${lastError?.message || 'Desconocido'}`);
     }
 
-    function buildNotionPrompt(options, textoTranscripcion) {
-      const categoriaKey = options.categoria || 'ejecutivo';
-      const categoriaData = PROMPT_CATEGORIES[categoriaKey] || PROMPT_CATEGORIES.ejecutivo;
+    // ═══════════════════ SYSTEM PROMPTS POR MODO ═══════════════════
+    function getSystemPromptForMode(mode, isLanguageFocus) {
 
-      const contextoStr = options.contexto.join(', ');
-      const enfoqueStr = options.enfoque.join(', ');
+      const REGLAS_COMUNES = `Eres el motor de IA de "Meeting Mind". Actúas como un TUTOR EXPERTO y CORRECTOR ACADÉMICO SENIOR. Tu única misión es transformar transcripciones crudas (imperfectas, con errores, con ideas a medias) en notas profesionalmente impecables, listas para estudiar, repasar o ejecutar.
 
-      let esquema;
-      if (categoriaKey === 'academico') {
-        esquema = `### 🎓 Tema de la Clase
-[Resumen del tema expuesto]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REGLAS UNIVERSALES (obligatorias en TODOS los modos)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-### 🧠 Conceptos y Definiciones
-* **[Concepto/Fórmula]**: [Explicación detallada]
+1) CORRECCIÓN Y PRECISIÓN ACADÉMICA:
+   • Si en la transcripción se dice un concepto técnico, fórmula, definición matemática, fecha, ley, nombre propio o dato de forma ERRÓNEA, CONFUSA O INCOMPLETA, NO lo repitas tal cual.
+   • CORRÍGELO a su versión académicamente correcta.
+   • Marca brevemente la corrección entre paréntesis cuando aplique: "(el audio decía: ...)".
 
-### 📝 Apuntes Clave
-* [Dato importante 1]
+2) ENRIQUECIMIENTO EXPLICATIVO:
+   • Si una idea quedó a medias o explicada de forma enredada, REESTRUCTÚRALA y COMPLÉTALA de forma didáctica, clara y fácil de repasar.
+   • Traduce lenguaje coloquial o muletillas a lenguaje formal y preciso.
 
-### ✅ Asignaciones (Checklist)
-- [ ] [Tarea, práctica o lectura pendiente]`;
-      } else if (categoriaKey === 'ejecutivo') {
-        esquema = `### 📝 Resumen Ejecutivo
-[Resumen conciso]
+3) SIN INVENTAR TEMAS AJENOS:
+   • PROHIBIDO introducir conceptos, autores, teorías, ejemplos o debates que NO fueron mencionados.
+   • Tu trabajo es PULIR y CORREGIR lo existente, no crear contenido nuevo.
+   • Si algo es inaudible o ambiguo, escribe "[inaudible]" o "[ambiguo en el audio]" — NUNCA inventes.
 
-### 💡 Puntos Clave
-* [Punto clave 1]
+4) FORMATO DE SALIDA — JSON ESTRICTO OBLIGATORIO:
+   Devuelve EXCLUSIVAMENTE un objeto JSON válido:
 
-### 🎯 Decisiones y Acuerdos
-* [Decisión 1]
+   {
+     "titulo_principal": "Título descriptivo y conciso",
+     "secciones": [
+       {
+         "titulo_seccion": "Nombre de la sección",
+         "tipo_contenido": "lista",
+         "contenido": ["elemento 1", "elemento 2"]
+       }
+     ]
+   }
 
-### ✅ Elementos de Acción (Checklist)
-- [ ] [Tarea con responsable/fecha]`;
-      } else if (categoriaKey === 'idiomas') {
-        esquema = `### 🌐 Explicación del Profesor
-[Explicación didáctica del tema]
+   REGLAS ESTRICTAS DEL JSON:
+   • Devuelve SOLO el JSON. Nada de texto antes, después, ni bloques \`\`\`json.
+   • "tipo_contenido" DEBE ser exactamente: "lista" | "parrafos" | "bloque".
+   • "contenido" es SIEMPRE un array de strings, incluso si tiene un solo elemento.
+   • "lista": cada string es un ítem SIN guiones ni asteriscos.
+   • "parrafos": cada string es un párrafo completo (2-4 frases).
+   • "bloque": cada string es un fragmento destacado (fórmulas, citas, código, datos numéricos).
+   • Escapa correctamente comillas internas (\\") y saltos de línea (\\n).
+   • PROHIBIDO usar markdown dentro de los strings (** ## - \`).
+   • Tildes, ñ y símbolos matemáticos (², ³, √, π, ∫) son bienvenidos.`;
 
-### 📖 Vocabulario Clave
-* **[Palabra]**: [Significado y ejemplo]
+      // ── MODO ACADÉMICO + IDIOMAS ──
+      if (mode === 'academico' && isLanguageFocus === true) {
+        return `${REGLAS_COMUNES}
 
-### ✏️ Reglas y Estructuras
-* [Regla gramatical aplicada]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODO ACTIVO: ACADÉMICO con ENFOQUE EN CLASE DE IDIOMAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-### 🔊 Pronunciación y Tips
-* [Consejo práctico]`;
-      } else {
-        esquema = `### 📝 Resumen General
-[Síntesis de lo tratado]
+PERFIL DEL USUARIO: Estudiante de idiomas que quiere repasar su clase con precisión gramatical y de vocabulario.
 
-### 💡 Ideas Principales
-* [Idea 1]
+ROL ESPECÍFICO: Actúas como TUTOR Y PROFESOR DE IDIOMAS EXPERTO. Dominas gramática normativa, fonética, fonología y didáctica de segundas lenguas.
 
-### 💭 Citas Destacadas
-* "[Cita textual]"
+REGLAS ESPECIALES DE ESTE MODO:
 
-### 📌 Notas Adicionales
-* [Nota]`;
+A) CORRECCIÓN AUTOMÁTICA DE LA TRANSCRIPCIÓN:
+   • El Whisper de la app puede haber escrito palabras mal (por acento, ruido, o mala dicción). CORRÍGELAS a su forma correcta en el idioma que se enseña.
+   • Ejemplos:
+     – Transcripción: "gouing tu de jardin" → Correcto: "going to the garden".
+     – Transcripción: "cómo se dice arbol en inglés" → Correcto: "árbol" (tilde en español).
+
+B) ANÁLISIS DE ERRORES DEL ALUMNO:
+   • Si el alumno pronunció o dijo algo mal y el profesor lo corrigió en el audio, regístralo en la sección de correcciones.
+   • Formato: "Dijiste: X → Correcto: Y (explicación breve)."
+
+C) FIDELIDAD AL IDIOMA DE TRABAJO:
+   • Identifica el idioma que se enseña y mantenlo consistente en vocabulario y ejemplos.
+   • Si se mezclan idiomas en el audio, separa claramente: "Español: X / English: Y".
+
+D) ESTRUCTURA OBLIGATORIA — usa EXACTAMENTE estas 5 secciones (en este orden):
+
+   1. "Explicación Didáctica del Profesor" → tipo_contenido: "parrafos"
+   2. "Vocabulario y Expresiones Clave" → tipo_contenido: "lista"
+   3. "Reglas Gramaticales y Estructuras" → tipo_contenido: "bloque"
+   4. "Corrección de Errores y Tips de Pronunciación" → tipo_contenido: "lista"
+   5. "Guía de Repaso Rápido" → tipo_contenido: "lista"
+
+E) PROHIBIDO:
+   • Inventar reglas gramaticales que no se mencionaron.
+   • Añadir vocabulario no presente en la transcripción.
+   • Crear ejercicios de temas NO cubiertos en la clase.
+
+Ahora genera el JSON con esas 5 secciones exactas.`;
       }
 
-      return `Eres el motor de IA de la aplicación "Meeting Mind". Eres un asistente experto en estructurar notas limpias en Markdown, idéntico a "Notion AI".
+      const REGLAS_MODO = {
 
-DATOS DE ENTRADA:
-- Categoría principal: ${categoriaData.label} (${categoriaData.emoji})
-- Contexto del audio: ${contextoStr}
-- Enfoque principal: ${enfoqueStr}
+        academico: `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODO ACTIVO: ACADÉMICO — Apuntes de Clase / Estudio
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-REGLAS ESTRICTAS:
-1. NO inventes información. Basa tu respuesta únicamente en el "Texto en crudo".
-2. Devuelve ÚNICAMENTE el texto en formato Markdown sin saludos ni introducciones.
+PERFIL DEL USUARIO: Estudiante universitario que repasará estos apuntes para un examen.
 
-INSTRUCCIONES DE FORMATO:
-Usa EXACTAMENTE este esquema (omite las secciones que no apliquen al contenido):
+ESTRUCTURA SUGERIDA (adáptala según el contenido real; omite las que no apliquen):
+  1. "📌 Tema Central" ..................... parrafos
+  2. "🧠 Conceptos y Definiciones" ......... lista
+  3. "🧮 Fórmulas y Datos Clave" ........... bloque
+  4. "📝 Desarrollo Explicativo" ........... parrafos
+  5. "⚠️ Correcciones al Audio" ........... lista
+  6. "✅ Tareas y Asignaciones" ............ lista
 
-${esquema}
+REGLAS ESPECIALES:
+  • Antepón la versión correcta y menciona la errónea entre paréntesis: "F = m·a (audio: F = m/a)".
+  • En fórmulas: respeta orden de operaciones, unidades del SI y símbolos correctos.
+  • En fechas históricas: verifica el año exacto; si el audio dudó, escribe "año exacto: XXXX (audio dudó)".`,
 
-TEXTO EN CRUDO:
-"""
-${textoTranscripcion}
-"""`;
+        ejecutivo: `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODO ACTIVO: EJECUTIVO — Reunión de Negocio / Trabajo
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PERFIL DEL USUARIO: Profesional que necesita un acta ejecutiva accionable.
+
+ESTRUCTURA SUGERIDA:
+  1. "📝 Resumen Ejecutivo" ................ parrafos
+  2. "💡 Puntos Clave" ..................... lista
+  3. "🎯 Decisiones y Acuerdos" ............ lista
+  4. "✅ Elementos de Acción" .............. lista (formato: "Tarea — Responsable — Fecha")
+  5. "📊 Métricas y Cifras" ................ bloque
+  6. "⚠️ Aclaraciones y Correcciones" ..... lista
+
+REGLAS ESPECIALES:
+  • Corrige siglas mal dichas: "KPI", "ROI" (no deletreadas).
+  • Unifica cifras: "treinta por ciento" → "30%".
+  • Si no se mencionó responsable/fecha, escribe "por asignar" / "sin definir" — NUNCA inventes.
+  • Concisión ejecutiva, cero relleno.`,
+
+        libre: `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODO ACTIVO: LIBRE — Reflexión / Podcast / Conversación
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+PERFIL DEL USUARIO: Persona que quiere rescatar ideas y citas valiosas.
+
+ESTRUCTURA SUGERIDA:
+  1. "📝 Resumen General" .................. parrafos
+  2. "💡 Ideas Principales" ................ lista
+  3. "💭 Citas Destacadas" ................. bloque
+  4. "📌 Notas y Matices" .................. lista
+  5. "🌱 Reflexiones Sugeridas" ............ lista
+
+REGLAS ESPECIALES:
+  • RESPETA la voz del autor. No conviertas charla informal en ensayo académico.
+  • Corrige SOLO errores factuales objetivos. NO toques interpretaciones subjetivas.
+  • Citas TEXTUALES entre comillas. Si el audio estaba distorsionado: "[audio confuso]".`
+      };
+
+      const reglasEspecificas = REGLAS_MODO[mode] || REGLAS_MODO.academico;
+      return `${REGLAS_COMUNES}\n\n${reglasEspecificas}`;
     }
 
+    // ═══════════════════ JSON → Markdown (para el renderer existente) ═══════════════════
+    function jsonNotesToMarkdown(obj) {
+      if (!obj || typeof obj !== 'object') return '';
+
+      const lines = [];
+      const titulo = obj.titulo_principal || obj.titulo || 'Apuntes de la sesión';
+      lines.push(`# ${titulo}`);
+      lines.push('');
+
+      const secciones = Array.isArray(obj.secciones) ? obj.secciones : [];
+      for (const sec of secciones) {
+        const secTitulo = sec.titulo_seccion || sec.titulo || 'Sección';
+        const tipo = (sec.tipo_contenido || sec.tipo || 'lista').toLowerCase();
+        const contenido = Array.isArray(sec.contenido)
+          ? sec.contenido
+          : (typeof sec.contenido === 'string' ? [sec.contenido] : []);
+
+        lines.push(`### ${secTitulo}`);
+        lines.push('');
+
+        if (tipo === 'lista') {
+          for (const item of contenido) {
+            const text = String(item).trim();
+            if (text) lines.push(`- ${text}`);
+          }
+        } else if (tipo === 'parrafos') {
+          for (const item of contenido) {
+            const text = String(item).trim();
+            if (text) {
+              lines.push(text);
+              lines.push('');
+            }
+          }
+        } else if (tipo === 'bloque') {
+          for (const item of contenido) {
+            const text = String(item).trim();
+            if (text) lines.push(`> ${text}`);
+          }
+        } else {
+          for (const item of contenido) {
+            const text = String(item).trim();
+            if (text) lines.push(`- ${text}`);
+          }
+        }
+        lines.push('');
+      }
+
+      return lines.join('\n').trim();
+    }
+
+    // Intenta parsear la respuesta del modelo como JSON. Si falla, devuelve null.
+    function tryParseNotesJson(rawText) {
+      if (!rawText || typeof rawText !== 'string') return null;
+
+      let cleaned = rawText.trim()
+        .replace(/^```(?:json)?\s*\n?/i, '')
+        .replace(/\n?```\s*$/i, '')
+        .trim();
+
+      try {
+        const parsed = JSON.parse(cleaned);
+        if (parsed && typeof parsed === 'object' && (parsed.titulo_principal || parsed.secciones)) {
+          return parsed;
+        }
+      } catch (e) {
+        // Intentar extraer el primer objeto JSON balanceado
+        const firstBrace = cleaned.indexOf('{');
+        const lastBrace = cleaned.lastIndexOf('}');
+        if (firstBrace !== -1 && lastBrace > firstBrace) {
+          try {
+            const candidate = cleaned.slice(firstBrace, lastBrace + 1);
+            const parsed = JSON.parse(candidate);
+            if (parsed && typeof parsed === 'object') return parsed;
+          } catch (_) {}
+        }
+      }
+      return null;
+    }
+
+    // ═══════════════════ CHECKBOX STATE ═══════════════════
     function getCheckboxState() {
       try { return JSON.parse(localStorage.getItem(LS_KEY_CHECKBOX) || '{}'); }
       catch (e) { return {}; }
@@ -2490,8 +2569,12 @@ ${textoTranscripcion}
       });
     }
 
+    // ═══════════════════ ANALYZE ═══════════════════
     async function analyzeText(text, notesContainer, options) {
-      const promptNotion = buildNotionPrompt(options, text);
+      const systemPrompt = getSystemPromptForMode(
+        options.categoria,
+        options.isLanguageFocus === true
+      );
 
       disableAllButtons();
       notesContainer.innerHTML = `
@@ -2505,33 +2588,56 @@ ${textoTranscripcion}
       const currentModel = memoriaTemporal.obtener(LS_KEY_MODEL) || 'llama-3.3-70b-versatile';
 
       try {
+        const userMessage = `${options.isLanguageFocus
+          ? 'Enfoque adicional: CLASE DE IDIOMAS. Aplica las 5 secciones obligatorias de idiomas.\n\n'
+          : ''}Contexto del audio: ${options.contexto.join(', ')}
+Enfoque principal: ${options.enfoque.join(', ')}
+
+TRANSCRIPCIÓN CRUDA:
+"""
+${text}
+"""
+
+Genera las notas AHORA en JSON estricto según el esquema indicado.`;
+
         const payload = {
           model: currentModel,
           messages: [
-            { role: 'system', content: promptNotion },
-            { role: 'user', content: 'Genera las notas ahora siguiendo estrictamente el formato Markdown indicado.' }
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userMessage }
           ],
-          temperature: 0.3,
-          max_tokens: 4096
+          temperature: 0.2,
+          max_tokens: 4096,
+          response_format: { type: 'json_object' }
         };
 
         const progressEl = document.getElementById('notion-progress');
         if (progressEl) progressEl.textContent = 'Procesando respuesta del modelo…';
 
-        const rawMarkdown = await callGroqChat(payload);
+        const rawResponse = await callGroqChat(payload);
 
-        const cleanMarkdown = rawMarkdown.trim()
-          .replace(/^```(?:markdown|md)?\s*\n?/i, '')
-          .replace(/\n?```\s*$/i, '')
-          .trim();
+        // Intentar parsear como JSON
+        const jsonNotes = tryParseNotesJson(rawResponse);
+        let markdownNotes, docTitle;
 
-        const titleMatch = cleanMarkdown.match(/^#\s+(.+)$/m)
-          || cleanMarkdown.match(/^###\s+[^\n]+/m);
-        const docTitle = titleMatch
-          ? (titleMatch[1] || titleMatch[0]).replace(/[*_`#]/g, '').trim()
-          : 'Apuntes de la sesión';
+        if (jsonNotes) {
+          markdownNotes = jsonNotesToMarkdown(jsonNotes);
+          docTitle = jsonNotes.titulo_principal || 'Apuntes de la sesión';
+        } else {
+          // Fallback: el modelo devolvió markdown directo
+          console.warn('[analyze] El modelo no devolvió JSON válido. Usando fallback markdown.');
+          markdownNotes = rawResponse.trim()
+            .replace(/^```(?:markdown|md)?\s*\n?/i, '')
+            .replace(/\n?```\s*$/i, '')
+            .trim();
+          const titleMatch = markdownNotes.match(/^#\s+(.+)$/m)
+            || markdownNotes.match(/^###\s+[^\n]+/m);
+          docTitle = titleMatch
+            ? (titleMatch[1] || titleMatch[0]).replace(/[*_`#]/g, '').trim()
+            : 'Apuntes de la sesión';
+        }
 
-        renderNotionNotes(cleanMarkdown, notesContainer, docTitle);
+        renderNotionNotes(markdownNotes, notesContainer, docTitle);
 
         setStatus('active', '✨ Notas Notion generadas');
         showToast('✅ Notas estilo Notion listas');
@@ -2709,6 +2815,7 @@ ${textoTranscripcion}
       }
     }
 
+    // ═══════════════════ PROYECTOS ═══════════════════
     function getProjects() {
       try {
         const raw = memoriaTemporal.obtener(LS_KEY_PROJECTS);
@@ -2875,7 +2982,7 @@ ${textoTranscripcion}
       const systemPrompt = `Eres un asistente experto. Recibirás varias notas Markdown de distintas sesiones de un mismo proyecto. Genera un "Resumen Global" en Markdown bien estructurado.
 REGLAS:
 - Usa H1 para el título, H2 para secciones, H3 para subtemas.
-- Incluye secciones: Resumen, Temas recurrentes, Decisiones clave, Elementos de acción (usa checkboxes Markdown \`- [ ] tarea\`).
+- Incluye secciones: Resumen, Temas recurrentes, Decisiones clave, Elementos de acción (usa checkboxes Markdown "- [ ] tarea").
 - No inventes información. Solo sintetiza lo que está en las notas.
 - Devuelve ÚNICAMENTE Markdown, sin explicaciones.`;
 
