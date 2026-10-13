@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var webView: WebView
     private val TAG = "MainActivity"
 
-    // 🔥 NUEVO — Referencia para el callback del selector de archivos
+    // Referencia para el callback del selector de archivos
     private var filePathCallback: ValueCallback<Array<Uri>>? = null
 
     // ─── Permisos requeridos en runtime ──────────────────────────
@@ -70,7 +70,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // 🔥 NUEVO — Launcher del selector de archivos
+    // Launcher del selector de archivos nativo
     private val filePickerLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -84,12 +84,10 @@ class MainActivity : AppCompatActivity() {
 
         val data = result.data
         val uris: Array<Uri>? = when {
-            // Selección múltiple
             data?.clipData != null -> {
                 val count = data.clipData!!.itemCount
                 Array(count) { i -> data.clipData!!.getItemAt(i).uri }
             }
-            // Selección simple
             data?.data != null -> arrayOf(data.data!!)
             else -> null
         }
@@ -156,22 +154,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         // ═══════════════════════════════════════════════════════
-        // 🔥 WebChromeClient CON SOPORTE PARA <input type="file">
+        // WebChromeClient CON SOPORTE PARA <input type="file">
         // ═══════════════════════════════════════════════════════
         webView.webChromeClient = object : WebChromeClient() {
 
-            // Permite getUserMedia si se usa el modo web
             override fun onPermissionRequest(request: PermissionRequest) {
                 request.grant(request.resources)
             }
 
-            // 🔥 CLAVE: abrir el selector de archivos nativo
             override fun onShowFileChooser(
                 webView: WebView?,
                 filePathCallback: ValueCallback<Array<Uri>>?,
                 fileChooserParams: FileChooserParams?
             ): Boolean {
-                // Cancelar cualquier picker pendiente
                 this@MainActivity.filePathCallback?.onReceiveValue(null)
                 this@MainActivity.filePathCallback = filePathCallback
 
@@ -181,7 +176,6 @@ class MainActivity : AppCompatActivity() {
                         this@MainActivity.filePathCallback = null
                         return false
                     }
-                    // El HTML ya define los mime types en el atributo `accept`
                     filePickerLauncher.launch(intent)
                     true
                 } catch (e: Exception) {
@@ -192,9 +186,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // ─── Puente nativo "AndroidNative" ─────────────────────
+        // Puente nativo "AndroidNative"
         webView.addJavascriptInterface(WebAppInterface(), "AndroidNative")
 
+        // Cargar HTML desde el asset loader (CORS-friendly)
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html")
     }
 
