@@ -11,962 +11,220 @@
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
 
   <style>
-    *, *::before, *::after {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      -webkit-tap-highlight-color: transparent;
-    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
 
     :root {
-      --accent: #FF7A00;
-      --accent-h: #FF9533;
-      --gold: #f5a623;
-      --error: #ff5c5c;
-      --success: #4caf50;
-      --radius: 14px;
-      --radius-sm: 10px;
+      --accent: #FF7A00; --accent-h: #FF9533; --gold: #f5a623; --error: #ff5c5c; --success: #4caf50;
+      --radius: 14px; --radius-sm: 10px;
       --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      --bg: #0B132B;
-      --surface: #1C2541;
-      --border: #3A506B;
-      --text: #F0F4F8;
-      --muted: #8AA2B7;
+      --bg: #0B132B; --surface: #1C2541; --border: #3A506B;
+      --text: #F0F4F8; --muted: #8AA2B7;
       --max-width: 1100px;
       --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
 
     html { height: 100%; }
-    body {
-      overscroll-behavior: none;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-    }
+    body { overscroll-behavior: none; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font);
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      background: var(--bg); color: var(--text); font-family: var(--font);
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
       padding: 20px 14px calc(40px + var(--safe-bottom));
-      -webkit-user-select: none;
-      user-select: none;
+      -webkit-user-select: none; user-select: none;
       touch-action: pan-y;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
+      -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
     }
 
-    #transcript-box, .notion-content, .modal-content, .nota-body {
-      -webkit-user-select: text;
-      user-select: text;
-    }
+    #transcript-box, .notion-content, .modal-content, .nota-body { -webkit-user-select: text; user-select: text; }
 
-    header {
-      width: 100%;
-      max-width: var(--max-width);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 24px;
-      flex-wrap: wrap;
-      gap: 12px;
-    }
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-size: 1.4rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
+    header { width: 100%; max-width: var(--max-width); display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+    .logo { display: flex; align-items: center; gap: 10px; font-size: 1.4rem; font-weight: 700; letter-spacing: -0.02em; }
     .logo-icon { font-size: 1.6rem; }
-    .badge {
-      background: var(--accent);
-      color: #fff;
-      font-size: 0.62rem;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 99px;
-      letter-spacing: 0.07em;
-      text-transform: uppercase;
-    }
-    #btn-config {
-      background: var(--surface);
-      border: 2px solid var(--border);
-      color: var(--muted);
-      padding: 10px 18px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      font-size: 0.85rem;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: all 0.25s ease;
-      min-height: 44px;
-      touch-action: manipulation;
-    }
+    .badge { background: var(--accent); color: #fff; font-size: 0.62rem; font-weight: 700; padding: 3px 8px; border-radius: 99px; letter-spacing: 0.07em; text-transform: uppercase; }
+    #btn-config { background: var(--surface); border: 2px solid var(--border); color: var(--muted); padding: 10px 18px; border-radius: var(--radius-sm); cursor: pointer; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: all 0.25s ease; min-height: 44px; touch-action: manipulation; }
     #btn-config:active { transform: scale(0.96); }
 
-    #config-panel {
-      width: 100%;
-      max-width: var(--max-width);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px;
-      margin-bottom: 20px;
-      display: none;
-      animation: fadeSlide 0.25s ease;
-    }
+    #config-panel { width: 100%; max-width: var(--max-width); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 20px; display: none; animation: fadeSlide 0.25s ease; }
     #config-panel.open { display: block; }
-    @keyframes fadeSlide {
-      from { opacity: 0; transform: translateY(-8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    #config-panel label {
-      font-size: 0.78rem;
-      color: var(--muted);
-      display: block;
-      margin-bottom: 6px;
-      font-weight: 600;
-      letter-spacing: 0.03em;
-    }
-    #config-panel select {
-      width: 100%;
-      background: var(--bg);
-      border: 2px solid var(--border);
-      color: var(--text);
-      padding: 11px 14px;
-      border-radius: var(--radius-sm);
-      font-size: 0.9rem;
-      outline: none;
-      font-family: var(--font);
-      cursor: pointer;
-      min-height: 44px;
-    }
+    @keyframes fadeSlide { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+    #config-panel label { font-size: 0.78rem; color: var(--muted); display: block; margin-bottom: 6px; font-weight: 600; letter-spacing: 0.03em; }
+    #config-panel select { width: 100%; background: var(--bg); border: 2px solid var(--border); color: var(--text); padding: 11px 14px; border-radius: var(--radius-sm); font-size: 0.9rem; outline: none; font-family: var(--font); cursor: pointer; min-height: 44px; }
     #config-panel select:focus { border-color: var(--accent); }
-    .key-divider {
-      border-top: 1px solid var(--border);
-      margin-top: 16px;
-      padding-top: 16px;
-    }
+    .key-divider { border-top: 1px solid var(--border); margin-top: 16px; padding-top: 16px; }
 
-    #groq-keys-input {
-      width: 100%;
-      min-height: 110px;
-      background: var(--bg);
-      color: var(--text);
-      border: 2px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 11px 14px;
-      font-family: 'SFMono-Regular', Consolas, Menlo, monospace;
-      font-size: 0.78rem;
-      line-height: 1.6;
-      outline: none;
-      resize: vertical;
-      -webkit-user-select: text;
-      user-select: text;
-    }
+    #groq-keys-input { width: 100%; min-height: 110px; background: var(--bg); color: var(--text); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 11px 14px; font-family: 'SFMono-Regular', Consolas, Menlo, monospace; font-size: 0.78rem; line-height: 1.6; outline: none; resize: vertical; -webkit-user-select: text; user-select: text; }
     #groq-keys-input:focus { border-color: var(--accent); }
-    #keys-save-status {
-      font-size: 0.75rem;
-      margin-top: 8px;
-      color: var(--muted);
-      min-height: 1em;
-    }
-    .keys-btn-row {
-      display: flex;
-      gap: 8px;
-      margin-top: 10px;
-      flex-wrap: wrap;
-    }
-    .keys-btn-row .btn-secondary {
-      flex: 1;
-      min-width: 130px;
-      font-size: 0.8rem;
-      padding: 10px 14px;
-      min-height: 44px;
-    }
 
-    .card {
-      width: 100%;
-      max-width: var(--max-width);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      overflow: hidden;
-      margin-bottom: 20px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
-    }
+    #gemini-key-input { width: 100%; background: var(--bg); color: var(--text); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 11px 14px; font-family: 'SFMono-Regular', Consolas, Menlo, monospace; font-size: 0.82rem; outline: none; -webkit-user-select: text; user-select: text; min-height: 44px; }
+    #gemini-key-input:focus { border-color: var(--accent); }
 
-    .actions {
-      padding: 20px 16px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-    }
-    .actions-label {
-      font-size: 0.7rem;
-      letter-spacing: 0.11em;
-      text-transform: uppercase;
-      color: var(--muted);
-      font-weight: 600;
-    }
-    .btn-row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: center;
-      width: 100%;
-    }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 13px 20px;
-      border-radius: var(--radius-sm);
-      font-size: 0.9rem;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: all 0.2s ease;
-      white-space: nowrap;
-      min-height: 48px;
-      touch-action: manipulation;
-    }
+    #keys-save-status, #gemini-key-status { font-size: 0.75rem; margin-top: 8px; color: var(--muted); min-height: 1em; }
+    .keys-btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    .keys-btn-row .btn-secondary { flex: 1; min-width: 130px; font-size: 0.8rem; padding: 10px 14px; min-height: 44px; }
+
+    .card { width: 100%; max-width: var(--max-width); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); }
+
+    .actions { padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .actions-label { font-size: 0.7rem; letter-spacing: 0.11em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; width: 100%; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 20px; border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: 600; cursor: pointer; border: none; transition: all 0.2s ease; white-space: nowrap; min-height: 48px; touch-action: manipulation; }
     .btn:active { transform: scale(0.96); }
     .btn:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
-    .btn-primary {
-      background: var(--accent);
-      color: #fff;
-      box-shadow: 0 4px 14px rgba(255, 122, 0, 0.25);
-    }
-    .btn-primary.recording {
-      background: var(--error);
-      animation: pulse 1.4s ease-in-out infinite;
-      box-shadow: 0 4px 18px rgba(255, 92, 92, 0.4);
-    }
-    .btn-secondary {
-      background: var(--bg);
-      color: var(--text);
-      border: 2px solid var(--border);
-    }
-    .btn-secondary:active {
-      border-color: var(--accent);
-      background: rgba(255, 122, 0, 0.05);
-    }
-    .btn-danger {
-      background: transparent;
-      color: var(--error);
-      border: 2px solid var(--error);
-    }
-    #btn-analyze {
-      width: 100%;
-      padding: 16px;
-      font-size: 1rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, var(--accent), #E0551F);
-      box-shadow: 0 4px 14px rgba(255, 122, 0, 0.32);
-      letter-spacing: 0.04em;
-      min-height: 52px;
-    }
-    #btn-start-record {
-      width: 100%;
-      padding: 16px;
-      font-size: 1rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, var(--accent), #E0551F);
-      box-shadow: 0 4px 14px rgba(255, 122, 0, 0.32);
-      letter-spacing: 0.04em;
-      min-height: 52px;
-    }
-    #btn-start-record.recording {
-      background: var(--error);
-      animation: pulse 1.4s ease-in-out infinite;
-      box-shadow: 0 4px 18px rgba(255, 92, 92, 0.4);
-    }
-    @keyframes pulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(255, 92, 92, 0.55); }
-      50% { box-shadow: 0 0 0 10px rgba(255, 92, 92, 0); }
-    }
+    .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 4px 14px rgba(255, 122, 0, 0.25); }
+    .btn-primary.recording { background: var(--error); animation: pulse 1.4s ease-in-out infinite; box-shadow: 0 4px 18px rgba(255, 92, 92, 0.4); }
+    .btn-secondary { background: var(--bg); color: var(--text); border: 2px solid var(--border); }
+    .btn-secondary:active { border-color: var(--accent); background: rgba(255, 122, 0, 0.05); }
+    .btn-danger { background: transparent; color: var(--error); border: 2px solid var(--error); }
+    #btn-analyze { width: 100%; padding: 16px; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--accent), #E0551F); box-shadow: 0 4px 14px rgba(255, 122, 0, 0.32); letter-spacing: 0.04em; min-height: 52px; }
+    #btn-start-record { width: 100%; padding: 16px; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--accent), #E0551F); box-shadow: 0 4px 14px rgba(255, 122, 0, 0.32); letter-spacing: 0.04em; min-height: 52px; }
+    #btn-start-record.recording { background: var(--error); animation: pulse 1.4s ease-in-out infinite; box-shadow: 0 4px 18px rgba(255, 92, 92, 0.4); }
+    @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 92, 92, 0.55); } 50% { box-shadow: 0 0 0 10px rgba(255, 92, 92, 0); } }
 
-    #status-dot {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.78rem;
-      color: var(--muted);
-      padding: 6px 14px;
-      border-radius: 99px;
-      border: 1px solid var(--border);
-      margin-top: 8px;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    #status-dot .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--muted);
-      flex-shrink: 0;
-      transition: background 0.3s;
-    }
+    #status-dot { display: inline-flex; align-items: center; gap: 8px; font-size: 0.78rem; color: var(--muted); padding: 6px 14px; border-radius: 99px; border: 1px solid var(--border); margin-top: 8px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #status-dot .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; transition: background 0.3s; }
     #status-dot.active .dot { background: var(--success); box-shadow: 0 0 8px var(--success); }
     #status-dot.loading .dot { background: var(--gold); animation: blink 0.8s step-start infinite; }
     #status-dot.error .dot { background: var(--error); box-shadow: 0 0 8px var(--error); }
     @keyframes blink { 50% { opacity: 0; } }
 
-    .tabs {
-      display: flex;
-      border-top: 1px solid var(--border);
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .tab {
-      flex: 1;
-      min-width: 100px;
-      padding: 14px 10px;
-      text-align: center;
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: var(--muted);
-      cursor: pointer;
-      border-bottom: 3px solid transparent;
-      transition: all 0.25s ease;
-      background: none;
-      border-top: none;
-      border-left: none;
-      border-right: none;
-      white-space: nowrap;
-      touch-action: manipulation;
-    }
+    .tabs { display: flex; border-top: 1px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .tab { flex: 1; min-width: 100px; padding: 14px 10px; text-align: center; font-size: 0.82rem; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.25s ease; background: none; border-top: none; border-left: none; border-right: none; white-space: nowrap; touch-action: manipulation; }
     .tab:active { background: rgba(255, 122, 0, 0.04); }
-    .tab.active {
-      color: var(--accent);
-      border-bottom-color: var(--accent);
-      background: rgba(255, 122, 0, 0.06);
-    }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(255, 122, 0, 0.06); }
 
     .tab-pane { display: none; padding: 16px; min-height: 180px; }
     .tab-pane.active { display: block; animation: fadeSlide 0.2s ease; }
 
-    #transcript-box {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 16px;
-      min-height: 120px;
-      font-size: 0.9rem;
-      line-height: 1.7;
-      color: var(--text);
-      white-space: pre-wrap;
-      word-break: break-word;
-      max-height: 50vh;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-    }
+    #transcript-box { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; min-height: 120px; font-size: 0.9rem; line-height: 1.7; color: var(--text); white-space: pre-wrap; word-break: break-word; max-height: 50vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
-    .notes-header {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 16px;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-    .notes-header-left,
-    .notes-header-right {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
+    .notes-header { display: flex; justify-content: space-between; margin-bottom: 16px; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .notes-header-left, .notes-header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .notes-header-left { flex: 1; }
-    .btn-copy-notion {
-      background: var(--bg);
-      border: 2px solid var(--border);
-      color: var(--text);
-      padding: 10px 16px;
-      border-radius: var(--radius-sm);
-      font-size: 0.82rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.22s ease;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      min-height: 44px;
-      touch-action: manipulation;
-    }
-    .btn-copy-notion:active {
-      border-color: var(--accent);
-      color: var(--accent);
-      background: rgba(255, 122, 0, 0.05);
-    }
-    .select-inline {
-      background: var(--bg);
-      border: 2px solid var(--border);
-      color: var(--text);
-      padding: 9px 12px;
-      border-radius: var(--radius-sm);
-      font-size: 0.82rem;
-      font-family: var(--font);
-      outline: none;
-      max-width: 180px;
-      cursor: pointer;
-      min-height: 44px;
-    }
+    .btn-copy-notion { background: var(--bg); border: 2px solid var(--border); color: var(--text); padding: 10px 16px; border-radius: var(--radius-sm); font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.22s ease; display: flex; align-items: center; gap: 6px; min-height: 44px; touch-action: manipulation; }
+    .btn-copy-notion:active { border-color: var(--accent); color: var(--accent); background: rgba(255, 122, 0, 0.05); }
+    .select-inline { background: var(--bg); border: 2px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: var(--radius-sm); font-size: 0.82rem; font-family: var(--font); outline: none; max-width: 180px; cursor: pointer; min-height: 44px; }
     .select-inline:focus { border-color: var(--accent); }
 
-    .notion-content {
-      background: #ffffff;
-      color: #37352f;
-      border-radius: var(--radius);
-      padding: 28px 22px;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Helvetica, Arial, sans-serif;
-      font-size: 15px;
-      line-height: 1.65;
-      letter-spacing: -0.003em;
-      word-break: break-word;
-      overflow-wrap: break-word;
-      -webkit-user-select: text;
-      user-select: text;
-    }
+    .notion-content { background: #ffffff; color: #37352f; border-radius: var(--radius); padding: 28px 22px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Helvetica, Arial, sans-serif; font-size: 15px; line-height: 1.65; letter-spacing: -0.003em; word-break: break-word; overflow-wrap: break-word; -webkit-user-select: text; user-select: text; }
     .notion-content > *:first-child { margin-top: 0 !important; }
     .notion-content > *:last-child { margin-bottom: 0 !important; }
-
     .notion-content h1 { font-size: 1.9em; font-weight: 700; margin: 0.3em 0 0.4em; letter-spacing: -0.02em; color: #37352f; }
     .notion-content h2 { font-size: 1.4em; font-weight: 600; margin: 1.4em 0 0.5em; color: #37352f; }
     .notion-content h3 { font-size: 1.15em; font-weight: 600; margin: 1.2em 0 0.4em; color: #37352f; }
     .notion-content h4 { font-size: 1em; font-weight: 600; margin: 1em 0 0.3em; color: #787774; }
     .notion-content p { margin: 0.6em 0; color: #37352f; }
-    .notion-content ul,
-    .notion-content ol { margin: 0.5em 0 0.7em; padding-left: 1.6em; }
+    .notion-content ul, .notion-content ol { margin: 0.5em 0 0.7em; padding-left: 1.6em; }
     .notion-content li { margin: 0.25em 0; padding-left: 0.15em; }
     .notion-content li::marker { color: #b7b6b4; }
     .notion-content strong { font-weight: 600; }
     .notion-content em { font-style: italic; }
     .notion-content a { color: inherit; text-decoration: underline; text-decoration-color: rgba(55, 53, 47, 0.4); text-underline-offset: 2px; }
-    .notion-content code {
-      background: rgba(135, 131, 120, 0.15);
-      color: #eb5757;
-      padding: 0.2em 0.4em;
-      border-radius: 3px;
-      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-      font-size: 0.85em;
-    }
-    .notion-content pre {
-      background: #f7f6f3;
-      color: #37352f;
-      border-radius: 4px;
-      padding: 14px 16px;
-      margin: 0.8em 0;
-      overflow-x: auto;
-      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
-      font-size: 0.85em;
-      line-height: 1.5;
-      -webkit-overflow-scrolling: touch;
-    }
+    .notion-content code { background: rgba(135, 131, 120, 0.15); color: #eb5757; padding: 0.2em 0.4em; border-radius: 3px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 0.85em; }
+    .notion-content pre { background: #f7f6f3; color: #37352f; border-radius: 4px; padding: 14px 16px; margin: 0.8em 0; overflow-x: auto; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 0.85em; line-height: 1.5; -webkit-overflow-scrolling: touch; }
     .notion-content pre code { background: none; color: inherit; padding: 0; font-size: inherit; }
-    .notion-content blockquote {
-      margin: 0.8em 0;
-      padding: 2px 0 2px 14px;
-      border-left: 3px solid #37352f;
-      color: #37352f;
-    }
+    .notion-content blockquote { margin: 0.8em 0; padding: 2px 0 2px 14px; border-left: 3px solid #37352f; color: #37352f; }
     .notion-content hr { border: none; border-top: 1px solid #e9e9e7; margin: 1.4em 0; }
 
     .notion-content ul.notion-checklist,
-    .notion-content ul:has(> li > input[type="checkbox"]) {
-      list-style: none;
-      padding-left: 0;
-      margin: 0.5em 0 0.7em;
-    }
-    .notion-content li.notion-check-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      padding: 3px 0;
-      margin: 0.15em 0;
-      list-style: none;
-    }
-    .notion-content input.notion-checkbox {
-      appearance: none;
-      -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
-      border: 1.5px solid #b3b3b1;
-      border-radius: 3px;
-      margin: 3px 0 0;
-      cursor: pointer;
-      flex-shrink: 0;
-      position: relative;
-      background: transparent;
-      transition: background 0.12s, border-color 0.12s;
-      outline: none;
-    }
+    .notion-content ul:has(> li > input[type="checkbox"]) { list-style: none; padding-left: 0; margin: 0.5em 0 0.7em; }
+    .notion-content li.notion-check-item { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; margin: 0.15em 0; list-style: none; }
+    .notion-content input.notion-checkbox { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; border: 1.5px solid #b3b3b1; border-radius: 3px; margin: 3px 0 0; cursor: pointer; flex-shrink: 0; position: relative; background: transparent; transition: background 0.12s, border-color 0.12s; outline: none; }
     .notion-content input.notion-checkbox:active { transform: scale(0.9); }
     .notion-content input.notion-checkbox:checked { background: #2383e2; border-color: #2383e2; }
-    .notion-content input.notion-checkbox:checked::after {
-      content: '';
-      position: absolute;
-      left: 4px;
-      top: 1px;
-      width: 4px;
-      height: 8px;
-      border: solid #fff;
-      border-width: 0 2px 2px 0;
-      transform: rotate(45deg);
-    }
+    .notion-content input.notion-checkbox:checked::after { content: ''; position: absolute; left: 4px; top: 1px; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
     .notion-content li.notion-check-item .notion-check-text { flex: 1; transition: color 0.15s; }
-    .notion-content li.notion-check-item.notion-checked .notion-check-text {
-      color: #9b9a97;
-      text-decoration: line-through;
-      text-decoration-color: #c4c4c2;
-    }
+    .notion-content li.notion-check-item.notion-checked .notion-check-text { color: #9b9a97; text-decoration: line-through; text-decoration-color: #c4c4c2; }
 
     .proyectos-create-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
-    .proyectos-create-row input {
-      flex: 1;
-      min-width: 150px;
-      background: var(--bg);
-      border: 2px solid var(--border);
-      color: var(--text);
-      padding: 11px 14px;
-      border-radius: var(--radius-sm);
-      font-size: 0.9rem;
-      outline: none;
-      min-height: 44px;
-    }
+    .proyectos-create-row input { flex: 1; min-width: 150px; background: var(--bg); border: 2px solid var(--border); color: var(--text); padding: 11px 14px; border-radius: var(--radius-sm); font-size: 0.9rem; outline: none; min-height: 44px; }
     .proyectos-create-row input:focus { border-color: var(--accent); }
-    .proyectos-create-row button {
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: var(--radius-sm);
-      padding: 11px 18px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      white-space: nowrap;
-      min-height: 44px;
-    }
+    .proyectos-create-row button { background: var(--accent); color: #fff; border: none; border-radius: var(--radius-sm); padding: 11px 18px; font-size: 0.85rem; font-weight: 600; cursor: pointer; white-space: nowrap; min-height: 44px; }
     .proyectos-create-row button:active { background: var(--accent-h); }
 
     .proyectos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
-    .proyecto-card {
-      background: var(--bg);
-      border: 2px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 16px;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      min-height: 100px;
-    }
+    .proyecto-card { background: var(--bg); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 16px; cursor: pointer; transition: all 0.25s ease; display: flex; flex-direction: column; gap: 6px; min-height: 100px; }
     .proyecto-card:active { transform: scale(0.96); }
     .proyecto-card .p-icon { font-size: 1.6rem; }
     .proyecto-card .p-name { font-size: 0.9rem; font-weight: 600; word-break: break-word; }
     .proyecto-card .p-meta { font-size: 0.72rem; color: var(--muted); }
 
-    .proyecto-detail-header {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-    .btn-back {
-      background: var(--bg);
-      border: 2px solid var(--border);
-      color: var(--text);
-      padding: 9px 14px;
-      border-radius: var(--radius-sm);
-      font-size: 0.82rem;
-      cursor: pointer;
-      min-height: 44px;
-    }
+    .proyecto-detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+    .btn-back { background: var(--bg); border: 2px solid var(--border); color: var(--text); padding: 9px 14px; border-radius: var(--radius-sm); font-size: 0.82rem; cursor: pointer; min-height: 44px; }
     .btn-back:active { border-color: var(--accent); background: rgba(255, 122, 0, 0.04); }
     .proyecto-detail-header h2 { font-size: 1.05rem; flex: 1; word-break: break-word; }
-    .btn-delete-proyecto {
-      background: transparent;
-      border: 2px solid var(--error);
-      color: var(--error);
-      padding: 9px 12px;
-      border-radius: var(--radius-sm);
-      font-size: 0.8rem;
-      cursor: pointer;
-      min-height: 44px;
-    }
+    .btn-delete-proyecto { background: transparent; border: 2px solid var(--error); color: var(--error); padding: 9px 12px; border-radius: var(--radius-sm); font-size: 0.8rem; cursor: pointer; min-height: 44px; }
     .btn-delete-proyecto:active { background: rgba(255, 92, 92, 0.12); }
 
-    .btn-global-summary {
-      width: 100%;
-      padding: 14px;
-      font-size: 0.95rem;
-      font-weight: 700;
-      border: none;
-      border-radius: var(--radius-sm);
-      background: linear-gradient(135deg, var(--accent), #E0551F);
-      color: #fff;
-      cursor: pointer;
-      margin-bottom: 16px;
-      box-shadow: 0 4px 16px rgba(255, 122, 0, 0.28);
-      min-height: 48px;
-    }
+    .btn-global-summary { width: 100%; padding: 14px; font-size: 0.95rem; font-weight: 700; border: none; border-radius: var(--radius-sm); background: linear-gradient(135deg, var(--accent), #E0551F); color: #fff; cursor: pointer; margin-bottom: 16px; box-shadow: 0 4px 16px rgba(255, 122, 0, 0.28); min-height: 48px; }
     .btn-global-summary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .nota-guardada {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 12px 14px;
-      margin-bottom: 10px;
-    }
-    .nota-guardada summary {
-      color: var(--text);
-      font-weight: 600;
-      font-size: 0.9rem;
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 8px;
-      outline: none;
-      min-height: 40px;
-    }
+    .nota-guardada { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 10px; }
+    .nota-guardada summary { color: var(--text); font-weight: 600; font-size: 0.9rem; cursor: pointer; display: flex; justify-content: space-between; align-items: center; gap: 8px; outline: none; min-height: 40px; }
     .nota-guardada summary::-webkit-details-marker { display: none; }
     .nota-guardada .fecha-tag { font-size: 0.7rem; color: var(--muted); font-weight: 400; }
     .nota-guardada .nota-body { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
     .nota-guardada .notion-content { padding: 18px 16px; font-size: 14.5px; }
 
-    .modal-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(11, 19, 43, 0.9);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-    }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(11, 19, 43, 0.9); z-index: 1000; align-items: center; justify-content: center; padding: 16px; }
     .modal-overlay.open { display: flex; animation: fadeIn 0.2s ease; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-    .modal-box {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      max-width: 640px;
-      width: 100%;
-      max-height: 90vh;
-      overflow-y: auto;
-      padding: 22px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
-      -webkit-overflow-scrolling: touch;
-    }
-    .modal-box h3 {
-      color: var(--accent);
-      font-size: 1.05rem;
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+    .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); max-width: 640px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 22px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4); -webkit-overflow-scrolling: touch; }
+    .modal-box h3 { color: var(--accent); font-size: 1.05rem; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
     .modal-subtitle { font-size: 0.82rem; color: var(--muted); margin-bottom: 18px; line-height: 1.5; }
     .modal-box .modal-content { font-size: 0.9rem; line-height: 1.7; color: var(--text); }
-    .btn-close-modal {
-      margin-top: 16px;
-      width: 100%;
-      background: var(--bg);
-      border: 2px solid var(--border);
-      color: var(--text);
-      padding: 12px;
-      border-radius: var(--radius-sm);
-      font-size: 0.9rem;
-      font-weight: 600;
-      cursor: pointer;
-      min-height: 48px;
-    }
+    .btn-close-modal { margin-top: 16px; width: 100%; background: var(--bg); border: 2px solid var(--border); color: var(--text); padding: 12px; border-radius: var(--radius-sm); font-size: 0.9rem; font-weight: 600; cursor: pointer; min-height: 48px; }
     .btn-close-modal:active { border-color: var(--accent); color: var(--accent); }
 
     .prompt-modal-box { max-width: 560px; }
     .prompt-step { margin-bottom: 20px; animation: fadeSlide 0.25s ease; }
-    .prompt-step-label {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
-    .prompt-step-num {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 20px;
-      height: 20px;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #fff;
-      font-size: 0.68rem;
-      font-weight: 800;
-      flex-shrink: 0;
-    }
+    .prompt-step-label { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+    .prompt-step-num { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 0.68rem; font-weight: 800; flex-shrink: 0; }
     .prompt-cat-chips { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-    .prompt-cat-chip {
-      background: var(--bg);
-      border: 2px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 14px 12px;
-      font-size: 0.88rem;
-      font-weight: 600;
-      color: var(--text);
-      cursor: pointer;
-      transition: all 0.22s ease;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      min-height: 52px;
-      text-align: left;
-      font-family: var(--font);
-      touch-action: manipulation;
-    }
+    .prompt-cat-chip { background: var(--bg); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 14px 12px; font-size: 0.88rem; font-weight: 600; color: var(--text); cursor: pointer; transition: all 0.22s ease; display: flex; align-items: center; gap: 8px; min-height: 52px; text-align: left; font-family: var(--font); touch-action: manipulation; }
     .prompt-cat-chip:active { transform: scale(0.97); }
-    .prompt-cat-chip.selected {
-      border-color: var(--accent);
-      background: rgba(255, 122, 0, 0.12);
-      box-shadow: 0 4px 14px rgba(255, 122, 0, 0.2);
-    }
+    .prompt-cat-chip.selected { border-color: var(--accent); background: rgba(255, 122, 0, 0.12); box-shadow: 0 4px 14px rgba(255, 122, 0, 0.2); }
     .prompt-cat-chip .cat-emoji { font-size: 1.2rem; }
 
     .prompt-check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
-    .prompt-check {
-      background: var(--bg);
-      border: 2px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 11px 12px;
-      cursor: pointer;
-      font-size: 0.82rem;
-      font-weight: 500;
-      transition: all 0.18s;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      min-height: 44px;
-      color: var(--text);
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-      font-family: var(--font);
-    }
+    .prompt-check { background: var(--bg); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 11px 12px; cursor: pointer; font-size: 0.82rem; font-weight: 500; transition: all 0.18s; display: flex; align-items: center; gap: 8px; min-height: 44px; color: var(--text); user-select: none; -webkit-tap-highlight-color: transparent; font-family: var(--font); }
     .prompt-check:active { transform: scale(0.97); }
     .prompt-check input { display: none; }
-    .prompt-check-box {
-      width: 16px;
-      height: 16px;
-      border: 1.5px solid var(--muted);
-      border-radius: 4px;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.15s;
-    }
+    .prompt-check-box { width: 16px; height: 16px; border: 1.5px solid var(--muted); border-radius: 4px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
     .prompt-check:has(input:checked) { border-color: var(--accent); background: rgba(255, 122, 0, 0.08); }
     .prompt-check:has(input:checked) .prompt-check-box { background: var(--accent); border-color: var(--accent); }
-    .prompt-check:has(input:checked) .prompt-check-box::after {
-      content: '';
-      width: 4px;
-      height: 8px;
-      border: solid #fff;
-      border-width: 0 2px 2px 0;
-      transform: rotate(45deg) translate(-1px, -1px);
-    }
+    .prompt-check:has(input:checked) .prompt-check-box::after { content: ''; width: 4px; height: 8px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg) translate(-1px, -1px); }
     .prompt-check-label { flex: 1; }
 
-    .prompt-empty-hint {
-      font-size: 0.78rem;
-      color: var(--muted);
-      padding: 14px;
-      text-align: center;
-      border: 1px dashed var(--border);
-      border-radius: var(--radius-sm);
-      line-height: 1.5;
-    }
-
-    .prompt-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 22px;
-      padding-top: 16px;
-      border-top: 1px solid var(--border);
-    }
-    .prompt-btn {
-      flex: 1;
-      padding: 14px;
-      border-radius: var(--radius-sm);
-      font-size: 0.92rem;
-      font-weight: 700;
-      cursor: pointer;
-      border: none;
-      transition: all 0.22s;
-      min-height: 48px;
-      touch-action: manipulation;
-      font-family: var(--font);
-    }
-    .prompt-btn-primary {
-      background: linear-gradient(135deg, var(--accent), #E0551F);
-      color: #fff;
-      box-shadow: 0 4px 14px rgba(255, 122, 0, 0.3);
-    }
+    .prompt-actions { display: flex; gap: 10px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .prompt-btn { flex: 1; padding: 14px; border-radius: var(--radius-sm); font-size: 0.92rem; font-weight: 700; cursor: pointer; border: none; transition: all 0.22s; min-height: 48px; touch-action: manipulation; font-family: var(--font); }
+    .prompt-btn-primary { background: linear-gradient(135deg, var(--accent), #E0551F); color: #fff; box-shadow: 0 4px 14px rgba(255, 122, 0, 0.3); }
     .prompt-btn-primary:active { transform: scale(0.97); }
     .prompt-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
-    .prompt-btn-secondary {
-      background: transparent;
-      color: var(--muted);
-      border: 2px solid var(--border);
-      flex: 0 0 auto;
-      min-width: 100px;
-    }
+    .prompt-btn-secondary { background: transparent; color: var(--muted); border: 2px solid var(--border); flex: 0 0 auto; min-width: 100px; }
     .prompt-btn-secondary:active { border-color: var(--accent); color: var(--text); }
 
-    .state-msg {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-      padding: 24px;
-      color: var(--muted);
-      font-size: 0.9rem;
-      text-align: center;
-    }
+    .state-msg { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; color: var(--muted); font-size: 0.9rem; text-align: center; }
     .state-msg.error-msg { color: var(--error); }
     .state-msg .big { font-size: 2rem; }
 
-    #toast {
-      position: fixed;
-      bottom: calc(20px + var(--safe-bottom));
-      left: 50%;
-      transform: translateX(-50%) translateY(80px);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 12px 20px;
-      border-radius: var(--radius-sm);
-      font-size: 0.85rem;
-      font-weight: 500;
-      transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-      z-index: 999;
-      white-space: nowrap;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-      max-width: 90vw;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+    #toast { position: fixed; bottom: calc(20px + var(--safe-bottom)); left: 50%; transform: translateX(-50%) translateY(80px); background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 12px 20px; border-radius: var(--radius-sm); font-size: 0.85rem; font-weight: 500; transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275); z-index: 999; white-space: nowrap; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); max-width: 90vw; overflow: hidden; text-overflow: ellipsis; }
     #toast.show { transform: translateX(-50%) translateY(0); }
 
-    #file-input, #import-file {
-      position: absolute;
-      left: -9999px;
-      top: -9999px;
-      width: 1px;
-      height: 1px;
-      opacity: 0;
-      overflow: hidden;
-      z-index: -1;
-    }
+    #file-input, #import-file { position: absolute; left: -9999px; top: -9999px; width: 1px; height: 1px; opacity: 0; overflow: hidden; z-index: -1; }
 
-    .diag-result {
-      font-size: 0.78rem;
-      line-height: 1.5;
-      padding: 10px 12px;
-      border-radius: var(--radius-sm);
-      margin-top: 10px;
-      font-family: monospace;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
+    .diag-result { font-size: 0.78rem; line-height: 1.5; padding: 10px 12px; border-radius: var(--radius-sm); margin-top: 10px; font-family: monospace; white-space: pre-wrap; word-break: break-word; }
     .diag-result.ok { background: rgba(76, 175, 80, 0.1); border: 1px solid var(--success); color: var(--success); }
     .diag-result.fail { background: rgba(255, 92, 92, 0.1); border: 1px solid var(--error); color: var(--error); }
 
-    .transcript-progress {
-      background: rgba(245, 166, 35, 0.08);
-      border: 1px solid var(--gold);
-      border-radius: var(--radius-sm);
-      padding: 10px 14px;
-      margin: 10px 0;
-      color: var(--gold);
-      font-size: 0.82rem;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      word-break: break-word;
-    }
-    .transcript-progress .spinner {
-      display: inline-block;
-      width: 14px;
-      height: 14px;
-      border: 2px solid rgba(245, 166, 35, 0.3);
-      border-top-color: var(--gold);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-      flex-shrink: 0;
-    }
+    .transcript-progress { background: rgba(245, 166, 35, 0.08); border: 1px solid var(--gold); border-radius: var(--radius-sm); padding: 10px 14px; margin: 10px 0; color: var(--gold); font-size: 0.82rem; display: flex; align-items: center; gap: 8px; word-break: break-word; }
+    .transcript-progress .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(245, 166, 35, 0.3); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .transcript-error {
-      background: rgba(255, 92, 92, 0.1);
-      border: 1px solid var(--error);
-      border-radius: var(--radius-sm);
-      padding: 12px 14px;
-      margin: 10px 0;
-      color: var(--error);
-      font-size: 0.82rem;
-      line-height: 1.5;
-      word-break: break-word;
-    }
+    .transcript-error { background: rgba(255, 92, 92, 0.1); border: 1px solid var(--error); border-radius: var(--radius-sm); padding: 12px 14px; margin: 10px 0; color: var(--error); font-size: 0.82rem; line-height: 1.5; word-break: break-word; }
     .transcript-error .err-title { font-weight: 700; display: block; margin-bottom: 6px; }
-    .transcript-error .err-detail {
-      font-family: monospace;
-      font-size: 0.72rem;
-      color: var(--muted);
-      background: var(--bg);
-      padding: 8px 10px;
-      border-radius: 6px;
-      margin-top: 8px;
-      overflow-x: auto;
-      white-space: pre-wrap;
-    }
+    .transcript-error .err-detail { font-family: monospace; font-size: 0.72rem; color: var(--muted); background: var(--bg); padding: 8px 10px; border-radius: 6px; margin-top: 8px; overflow-x: auto; white-space: pre-wrap; }
 
-    .transcript-cancel-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: transparent;
-      border: 2px solid var(--error);
-      color: var(--error);
-      padding: 8px 14px;
-      border-radius: var(--radius-sm);
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 8px;
-      min-height: 40px;
-      font-family: var(--font);
-    }
+    .transcript-cancel-btn { display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 2px solid var(--error); color: var(--error); padding: 8px 14px; border-radius: var(--radius-sm); font-size: 0.8rem; font-weight: 600; cursor: pointer; margin-top: 8px; min-height: 40px; font-family: var(--font); }
     .transcript-cancel-btn:active { background: rgba(255, 92, 92, 0.15); }
 
     @media (max-width: 480px) {
@@ -992,16 +250,40 @@
     <div class="logo">
       <span class="logo-icon">🧠</span>
       <span>Meeting Mind</span>
-      <span class="badge">GROQ</span>
+      <span class="badge">GEMINI</span>
     </div>
     <button id="btn-config">⚙️ Configuración</button>
   </header>
 
   <div id="config-panel">
-    <label for="model-select">Modelo de Inteligencia Artificial (Texto — Groq)</label>
-    <select id="model-select">
-      <option value="">Cargando modelos dinámicos...</option>
+
+    <!-- 🔮 Gemini: Motor de Notas Inteligentes -->
+    <label for="gemini-model-select">Modelo de Notas Inteligentes (Gemini)</label>
+    <select id="gemini-model-select">
+      <option value="gemini-1.5-flash">✨ gemini-1.5-flash (rápido, recomendado)</option>
+      <option value="gemini-1.5-flash-8b">⚡ gemini-1.5-flash-8b (más rápido)</option>
+      <option value="gemini-1.5-pro">🧠 gemini-1.5-pro (más potente)</option>
+      <option value="gemini-2.0-flash-exp">🚀 gemini-2.0-flash-exp (experimental)</option>
     </select>
+
+    <div class="key-divider">
+      <label>🔮 Gemini API Key (para Notas Inteligentes)</label>
+      <p style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;line-height:1.5;">
+        Consigue tu key gratis en <strong>aistudio.google.com/app/apikey</strong>. Empieza por <code style="background:rgba(135,131,120,0.15);padding:1px 5px;border-radius:3px;">AIza</code>.
+        Se guarda localmente y <strong>persiste entre actualizaciones del APK</strong>.
+      </p>
+      <input type="password" id="gemini-key-input"
+             placeholder="AIzaSy..."
+             spellcheck="false"
+             autocapitalize="off"
+             autocomplete="off"
+             autocorrect="off" />
+      <div class="keys-btn-row">
+        <button id="btn-save-gemini-key" class="btn-secondary">💾 Guardar</button>
+        <button id="btn-test-gemini" class="btn-secondary">🧪 Probar</button>
+      </div>
+      <div id="gemini-key-status"></div>
+    </div>
 
     <div class="key-divider">
       <label>Copia de Seguridad</label>
@@ -1013,10 +295,9 @@
     </div>
 
     <div class="key-divider">
-      <label>🔑 API Keys de Groq (editables sin recompilar)</label>
+      <label>🎙️ Groq API Keys (solo para Transcripción Whisper)</label>
       <p style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;line-height:1.5;">
-        Pega una key por línea. Deben empezar por <code style="background:rgba(135,131,120,0.15);padding:1px 5px;border-radius:3px;">gsk_</code>.
-        Se guardan localmente en este dispositivo y <strong>persisten entre actualizaciones del APK</strong>.
+        Estas keys se usan <strong>únicamente</strong> para transcribir audios con Whisper. Pega una key por línea.
       </p>
       <textarea id="groq-keys-input"
                 placeholder="gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&#10;gsk_yyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
@@ -1032,10 +313,10 @@
     </div>
 
     <div class="key-divider">
-      <label>🔬 Diagnóstico de conexión</label>
+      <label>🔬 Diagnóstico de conexión (Groq/Whisper)</label>
       <div style="margin-top: 10px;">
         <button id="btn-test-apis" class="btn-secondary" style="font-size: 0.8rem; padding: 9px 12px; min-height: 44px; width: 100%;">
-          🔬 Probar las <span id="keys-count-diag">2</span> API Keys con Groq
+          🔬 Probar las <span id="keys-count-diag">2</span> Groq API Keys
         </button>
         <div id="diag-result" style="display:none;"></div>
       </div>
@@ -1125,8 +406,7 @@
             </span>
           </label>
           <div style="font-size:0.72rem; color:var(--muted); margin-top:6px; line-height:1.5;">
-            Actívalo si la clase es de un idioma (inglés, francés, etc.). La IA corregirá
-            pronunciación, vocabulario y gramática, y estructurará las notas como guía de estudio del idioma.
+            Actívalo si la clase es de un idioma. La IA corregirá pronunciación, vocabulario y gramática, y estructurará las notas como guía de estudio.
           </div>
         </div>
       </div>
@@ -1163,7 +443,48 @@
   </div>
 
   <script>
-    // ═══════════════════ API KEYS Y ENDPOINTS (GROQ) ═══════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // 🔮 GEMINI — Configuración para Notas Inteligentes
+    // ═══════════════════════════════════════════════════════════════
+    // ⚠️ REEMPLAZA EL VALOR DE ABAJO POR TU API KEY REAL DE GEMINI
+    const GEMINI_API_KEY_DEFAULT = 'PEGA_AQUI_TU_API_KEY_DE_GEMINI';
+
+    const LS_KEY_GEMINI_API = 'meetingmind_gemini_api_key';
+    const LS_KEY_GEMINI_MODEL = 'meetingmind_gemini_model';
+
+    const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+
+    function isValidGeminiKey(k) {
+      return typeof k === 'string' && k.trim().startsWith('AIza') && k.trim().length > 20;
+    }
+
+    function loadGeminiKey() {
+      try {
+        const stored = localStorage.getItem(LS_KEY_GEMINI_API);
+        if (isValidGeminiKey(stored)) return stored.trim();
+      } catch (e) {}
+      return GEMINI_API_KEY_DEFAULT;
+    }
+
+    let GEMINI_API_KEY = loadGeminiKey();
+
+    function saveGeminiKey(key) {
+      const cleaned = (key || '').trim();
+      if (!isValidGeminiKey(cleaned)) {
+        return { ok: false, error: 'La key debe empezar por "AIza" y tener al menos 20 caracteres.' };
+      }
+      try {
+        localStorage.setItem(LS_KEY_GEMINI_API, cleaned);
+        GEMINI_API_KEY = cleaned;
+        return { ok: true };
+      } catch (e) {
+        return { ok: false, error: e.message };
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🎙️ GROQ — Solo para Whisper (transcripción de audio)
+    // ═══════════════════════════════════════════════════════════════
     const GROQ_KEYS_DEFAULT = [
       "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",
       "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"
@@ -1191,7 +512,6 @@
     }
 
     let GROQ_KEYS = loadGroqKeys();
-
     let groqKeyIndex = 0;
     function getNextGroqKey() {
       const key = GROQ_KEYS[groqKeyIndex];
@@ -1200,17 +520,12 @@
     }
 
     function saveGroqKeys(keysArray) {
-      const cleaned = keysArray
-        .map(k => (typeof k === 'string' ? k.trim() : ''))
-        .filter(isValidGroqKey);
-
+      const cleaned = keysArray.map(k => (typeof k === 'string' ? k.trim() : '')).filter(isValidGroqKey);
       if (cleaned.length === 0) return { ok: false, error: 'No hay keys válidas.' };
-
       try {
         localStorage.setItem(LS_KEY_GROQ_KEYS, JSON.stringify(cleaned));
         GROQ_KEYS = cleaned;
         groqKeyIndex = 0;
-        cachedAvailableModels = null;
         return { ok: true, count: cleaned.length };
       } catch (e) {
         return { ok: false, error: e.message };
@@ -1221,7 +536,6 @@
       try { localStorage.removeItem(LS_KEY_GROQ_KEYS); } catch (e) {}
       GROQ_KEYS = [...GROQ_KEYS_DEFAULT];
       groqKeyIndex = 0;
-      cachedAvailableModels = null;
     }
 
     function updateKeysCountUI() {
@@ -1230,19 +544,15 @@
     }
 
     const GROQ_AUDIO_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
-    const GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions';
     const GROQ_MODELS_URL = 'https://api.groq.com/openai/v1/models';
 
-    const LS_KEY_MODEL = 'meetingmind_groq_text_model';
     const LS_KEY_PROJECTS = 'meetingmind_projects';
     const LS_KEY_MODE = 'meetingmind_analysis_mode';
     const LS_KEY_CHECKBOX = 'meetingmind_notion_checkboxes';
 
-    // ═══════════ Categorías ═══════════
     const PROMPT_CATEGORIES = {
       academico: {
-        label: 'Académico',
-        emoji: '🎓',
+        label: 'Académico', emoji: '🎓',
         context: [
           { value: 'Clase Teórica', label: 'Clase Teórica', emoji: '📖' },
           { value: 'Laboratorio Práctico', label: 'Laboratorio Práctico', emoji: '🔬' },
@@ -1256,8 +566,7 @@
         ]
       },
       ejecutivo: {
-        label: 'Ejecutivo',
-        emoji: '💼',
+        label: 'Ejecutivo', emoji: '💼',
         context: [
           { value: 'Reunión de Avance', label: 'Reunión de Avance', emoji: '📈' },
           { value: 'Lluvia de Ideas', label: 'Lluvia de Ideas', emoji: '💡' },
@@ -1271,8 +580,7 @@
         ]
       },
       libre: {
-        label: 'Libre',
-        emoji: '📝',
+        label: 'Libre', emoji: '📝',
         context: [
           { value: 'Podcast / Radio', label: 'Podcast / Radio', emoji: '📻' },
           { value: 'Conversación Libre', label: 'Conversación Libre', emoji: '💬' },
@@ -1286,66 +594,6 @@
         ]
       }
     };
-
-    // ═══════════════════════════════════════════════════════════════
-    // 🔥 CHUNKING — Constante y helpers para dividir texto
-    // ═══════════════════════════════════════════════════════════════
-    const WORDS_PER_CHUNK = 1200;
-
-    function splitIntoWordChunks(text, wordsPerChunk = WORDS_PER_CHUNK) {
-      const clean = String(text || '').trim();
-      if (!clean) return [];
-
-      const words = clean.split(/\s+/).filter(Boolean);
-      if (words.length <= wordsPerChunk) return [clean];
-
-      const chunks = [];
-      for (let i = 0; i < words.length; i += wordsPerChunk) {
-        chunks.push(words.slice(i, i + wordsPerChunk).join(' '));
-      }
-      return chunks;
-    }
-
-    function mergeJsonNotes(jsonNotesArray) {
-      if (!Array.isArray(jsonNotesArray) || jsonNotesArray.length === 0) return null;
-      if (jsonNotesArray.length === 1) return jsonNotesArray[0];
-
-      const merged = {
-        titulo_principal: jsonNotesArray[0]?.titulo_principal || 'Apuntes de la sesión',
-        secciones: []
-      };
-
-      const sectionMap = new Map();
-
-      for (const notes of jsonNotesArray) {
-        if (!notes || !Array.isArray(notes.secciones)) continue;
-
-        for (const sec of notes.secciones) {
-          const title = sec.titulo_seccion || 'Sección';
-          const key = title.toLowerCase().trim();
-
-          if (!sectionMap.has(key)) {
-            sectionMap.set(key, {
-              titulo_seccion: title,
-              tipo_contenido: sec.tipo_contenido || 'lista',
-              contenido: []
-            });
-          }
-
-          const target = sectionMap.get(key);
-          const items = Array.isArray(sec.contenido) ? sec.contenido : [];
-          for (const it of items) {
-            const s = String(it).trim();
-            if (s && !target.contenido.includes(s)) {
-              target.contenido.push(s);
-            }
-          }
-        }
-      }
-
-      merged.secciones = Array.from(sectionMap.values());
-      return merged;
-    }
 
     function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -1408,73 +656,6 @@
       txt.textContent = text;
     }
 
-    // ═══════════ fetchAvailableModels (con filtro safeguard/llava) ═══════════
-    let cachedAvailableModels = null;
-    async function fetchAvailableModels(forceRefresh = false) {
-      if (cachedAvailableModels && !forceRefresh) return cachedAvailableModels;
-      try {
-        const response = await fetchWithTimeout(GROQ_MODELS_URL, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${GROQ_KEYS[0]}` }
-        }, 20000);
-
-        if (!response.ok) {
-          cachedAvailableModels = ['llama-3.1-70b-versatile', 'llama3-8b-8192'];
-          return cachedAvailableModels;
-        }
-
-        const data = await response.json();
-        const ids = (data.data || []).map(m => m.id);
-
-        // 🔥 FIX — Excluir modelos que NO sirven para texto puro
-        const valid = ids.filter(id => {
-          const low = id.toLowerCase();
-          return !low.includes('whisper') &&
-                 !low.includes('prompt-guard') &&
-                 !low.includes('safeguard') &&
-                 !low.includes('llava') &&
-                 !low.includes('vision') &&
-                 !low.includes('tts') &&
-                 !low.includes('embed') &&
-                 !low.includes('guard');
-        });
-
-        const prioridad = [
-          'llama-3.1-70b-versatile',
-          'llama3-8b-8192',
-          'llama-3.3-70b-versatile',
-          'llama-3.1-8b-instant'
-        ];
-
-        const preferred = [];
-        for (const p of prioridad) {
-          if (valid.includes(p) && !preferred.includes(p)) preferred.push(p);
-        }
-
-        for (const id of valid) {
-          if (preferred.length >= 4) break;
-          const low = id.toLowerCase();
-          if (!preferred.includes(id) &&
-              (low.includes('llama') || low.includes('mixtral') ||
-               low.includes('gemma') || low.includes('gpt-oss'))) {
-            preferred.push(id);
-          }
-        }
-
-        cachedAvailableModels = preferred.length > 0
-          ? preferred
-          : ['llama-3.1-70b-versatile', 'llama3-8b-8192'];
-
-        console.log('[fetchAvailableModels] Modelos válidos:', cachedAvailableModels);
-        return cachedAvailableModels;
-
-      } catch (err) {
-        console.error('Error obteniendo modelos:', err);
-        cachedAvailableModels = ['llama-3.1-70b-versatile', 'llama3-8b-8192'];
-        return cachedAvailableModels;
-      }
-    }
-
     const memoriaTemporal = {
       datos: {},
       guardar(c, v) { try { localStorage.setItem(c, v); } catch (e) { this.datos[c] = v; } },
@@ -1493,10 +674,7 @@
     let recordingChunkInterval = null;
 
     let promptModalState = {
-      categoria: null,
-      contexto: [],
-      enfoque: [],
-      isLanguageFocus: false
+      categoria: null, contexto: [], enfoque: [], isLanguageFocus: false
     };
 
     window.addEventListener('DOMContentLoaded', () => {
@@ -1506,7 +684,7 @@
     function initUI() {
       const btnConfig = document.getElementById('btn-config');
       const configPanel = document.getElementById('config-panel');
-      const modelSelect = document.getElementById('model-select');
+      const geminiModelSelect = document.getElementById('gemini-model-select');
       const btnStartRecord = document.getElementById('btn-start-record');
       const btnUpload = document.getElementById('btn-upload');
       const btnAnalyze = document.getElementById('btn-analyze');
@@ -1515,6 +693,74 @@
       const tabs = document.querySelectorAll('.tab');
       const tabPanes = document.querySelectorAll('.tab-pane');
 
+      // ── Gemini: UI de API key y modelo ──
+      const geminiKeyInput = document.getElementById('gemini-key-input');
+      const geminiKeyStatus = document.getElementById('gemini-key-status');
+      geminiKeyInput.value = (GEMINI_API_KEY === GEMINI_API_KEY_DEFAULT || !GEMINI_API_KEY) ? '' : GEMINI_API_KEY;
+
+      // Modelo guardado
+      const savedModel = memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-1.5-flash';
+      if ([...geminiModelSelect.options].some(o => o.value === savedModel)) {
+        geminiModelSelect.value = savedModel;
+      }
+      geminiModelSelect.addEventListener('change', () => {
+        memoriaTemporal.guardar(LS_KEY_GEMINI_MODEL, geminiModelSelect.value);
+        showToast('✅ Modelo: ' + geminiModelSelect.value);
+      });
+
+      document.getElementById('btn-save-gemini-key').addEventListener('click', () => {
+        const result = saveGeminiKey(geminiKeyInput.value);
+        if (result.ok) {
+          geminiKeyStatus.textContent = '✅ Gemini API Key guardada correctamente.';
+          geminiKeyStatus.style.color = 'var(--success)';
+          showToast('✅ Key de Gemini guardada');
+        } else {
+          geminiKeyStatus.textContent = '⚠️ ' + result.error;
+          geminiKeyStatus.style.color = 'var(--error)';
+          showToast('⚠️ ' + result.error);
+        }
+      });
+
+      document.getElementById('btn-test-gemini').addEventListener('click', async () => {
+        geminiKeyStatus.textContent = '🧪 Probando conexión con Gemini…';
+        geminiKeyStatus.style.color = 'var(--muted)';
+        const model = geminiModelSelect.value;
+        try {
+          const testPayload = {
+            contents: [{ parts: [{ text: 'Responde con el JSON: {"ok": true}' }] }],
+            generationConfig: { responseMimeType: 'application/json', temperature: 0 }
+          };
+          const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${GEMINI_API_KEY}`;
+          const res = await fetchWithTimeout(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(testPayload)
+          }, 30000);
+
+          if (res.ok) {
+            const data = await res.json();
+            const txt = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            if (txt) {
+              geminiKeyStatus.textContent = `✅ Gemini responde correctamente con "${model}".`;
+              geminiKeyStatus.style.color = 'var(--success)';
+              showToast('✅ Gemini OK');
+            } else {
+              geminiKeyStatus.textContent = '⚠️ Respuesta vacía de Gemini.';
+              geminiKeyStatus.style.color = 'var(--error)';
+            }
+          } else {
+            const errData = await res.json().catch(() => ({}));
+            const errMsg = errData?.error?.message || `HTTP ${res.status}`;
+            geminiKeyStatus.textContent = `❌ Error ${res.status}: ${errMsg}`;
+            geminiKeyStatus.style.color = 'var(--error)';
+          }
+        } catch (err) {
+          geminiKeyStatus.textContent = `❌ ${err.message}`;
+          geminiKeyStatus.style.color = 'var(--error)';
+        }
+      });
+
+      // ── Groq keys (Whisper) ──
       const keysInput = document.getElementById('groq-keys-input');
       const keysStatus = document.getElementById('keys-save-status');
       keysInput.value = GROQ_KEYS.join('\n');
@@ -1523,9 +769,8 @@
       document.getElementById('btn-save-keys').addEventListener('click', () => {
         const lines = keysInput.value.split('\n').map(s => s.trim()).filter(Boolean);
         const result = saveGroqKeys(lines);
-
         if (result.ok) {
-          keysStatus.textContent = `✅ ${result.count} key(s) guardada(s). La app las usará en el próximo request.`;
+          keysStatus.textContent = `✅ ${result.count} key(s) guardada(s) para Whisper.`;
           keysStatus.style.color = 'var(--success)';
           updateKeysCountUI();
           showToast(`✅ ${result.count} key(s) guardada(s)`);
@@ -1537,32 +782,16 @@
       });
 
       document.getElementById('btn-reset-keys').addEventListener('click', () => {
-        if (!confirm('¿Restaurar las API keys de fábrica? Se perderán las personalizadas.')) return;
+        if (!confirm('¿Restaurar las Groq API keys de fábrica?')) return;
         resetGroqKeys();
         keysInput.value = GROQ_KEYS.join('\n');
-        keysStatus.textContent = '↺ Keys restauradas a las de fábrica.';
+        keysStatus.textContent = '↺ Keys restauradas.';
         keysStatus.style.color = 'var(--muted)';
         updateKeysCountUI();
         showToast('↺ Keys restauradas');
       });
 
-      fetchAvailableModels().then(models => {
-        if (models.length > 0) {
-          modelSelect.innerHTML = models.map(m => `<option value="${m}">🧠 ${m}</option>`).join('');
-          const saved = memoriaTemporal.obtener(LS_KEY_MODEL);
-          if (saved && models.includes(saved)) modelSelect.value = saved;
-          else { modelSelect.value = models[0]; memoriaTemporal.guardar(LS_KEY_MODEL, models[0]); }
-        } else {
-          modelSelect.innerHTML = `<option value="llama-3.1-70b-versatile">🧠 llama-3.1-70b-versatile</option>`;
-          memoriaTemporal.guardar(LS_KEY_MODEL, 'llama-3.1-70b-versatile');
-        }
-      });
-      modelSelect.addEventListener('change', () => {
-        memoriaTemporal.guardar(LS_KEY_MODEL, modelSelect.value);
-      });
-
       currentMode = memoriaTemporal.obtener(LS_KEY_MODE) || 'ejecutivo';
-
       btnConfig.addEventListener('click', () => configPanel.classList.toggle('open'));
 
       tabs.forEach(tab => {
@@ -1679,7 +908,7 @@
           const resultEl = document.getElementById('diag-result');
           resultEl.style.display = 'block';
           resultEl.className = 'diag-result';
-          resultEl.textContent = `🔬 Probando las ${GROQ_KEYS.length} API Keys contra Groq...\n\n`;
+          resultEl.textContent = `🔬 Probando las ${GROQ_KEYS.length} Groq API Keys (Whisper)...\n\n`;
 
           let okCount = 0;
           const lines = [];
@@ -1717,11 +946,6 @@
           const summary = `\n\n📊 Resultado: ${okCount}/${GROQ_KEYS.length} keys funcionan.`;
           resultEl.textContent = lines.join('\n') + summary;
           resultEl.className = 'diag-result ' + (okCount === GROQ_KEYS.length ? 'ok' : 'fail');
-
-          if (okCount === 0) {
-            lines.push('\n\n🚨 TODAS las keys están muertas. Ve a https://console.groq.com/keys y genera nuevas. Luego pégalas arriba en "🔑 API Keys de Groq".');
-            resultEl.textContent = lines.join('\n');
-          }
         });
       }
     }
@@ -1983,45 +1207,31 @@
           throw new Error('Audio nativo vacío o inválido.');
         }
 
-        const cleanB64 = base64Audio.includes(',')
-          ? base64Audio.split(',').pop()
-          : base64Audio;
-
+        const cleanB64 = base64Audio.includes(',') ? base64Audio.split(',').pop() : base64Audio;
         const binary = atob(cleanB64);
         const len = binary.length;
         const bytes = new Uint8Array(len);
         for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
 
         const blob = new Blob([bytes], { type: 'audio/mp4' });
-        const file = new File(
-          [blob],
-          `record_native_${Date.now()}.m4a`,
-          { type: 'audio/mp4' }
-        );
+        const file = new File([blob], `record_native_${Date.now()}.m4a`, { type: 'audio/mp4' });
 
         resetRecordButton();
         setStatus('loading', 'Transcribiendo grabación nativa…');
 
         await transcribeRecordedChunk(file);
-
       } catch (err) {
         console.error('[receiveNativeAudio]', err);
-
         const msg = (err && err.message) ? err.message : '';
         const isNetworkError =
-          msg.includes('Error de red') ||
-          msg.includes('timeout') ||
-          msg.includes('Failed to fetch') ||
-          msg.includes('NetworkError') ||
-          msg.includes('Todas las') ||
-          msg.includes('todas las') ||
-          msg.includes('API Keys fallaron') ||
-          msg.includes('Load failed');
+          msg.includes('Error de red') || msg.includes('timeout') ||
+          msg.includes('Failed to fetch') || msg.includes('NetworkError') ||
+          msg.includes('Todas las') || msg.includes('todas las') ||
+          msg.includes('API Keys fallaron') || msg.includes('Load failed');
 
         if (isNetworkError) {
           showToast('⚠️ Sin conexión. Tu audio está guardado en Música > MeetingMind', 8000);
           setStatus('error', '⚠️ Error de red — audio guardado en Música > MeetingMind');
-
           const box = document.getElementById('transcript-box');
           if (box) {
             const notice = document.createElement('div');
@@ -2039,9 +1249,7 @@
           showToast('❌ Error al procesar audio nativo: ' + msg);
           setStatus('error', 'Error al procesar audio nativo');
         }
-
         resetRecordButton();
-
       } finally {
         isRecordingActive = false;
         enableAllButtons();
@@ -2061,7 +1269,7 @@
       document.getElementById('btn-clear').style.display = 'block';
     }
 
-    // ═══════════════════ TRANSCRIPCIÓN MÚLTIPLE ═══════════════════
+    // ═══════════════════ TRANSCRIPCIÓN MÚLTIPLE (GROQ WHISPER) ═══════════════════
     async function handleMultipleAudioFiles(files, box) {
       disableAllButtons();
       if (!accumulatedTranscript.trim()) box.textContent = '';
@@ -2104,10 +1312,7 @@
         try {
           const transcript = await transcribeWithGroqChunked(file, (msg) => {
             const textEl = progressEl.querySelector('.progress-text');
-            if (textEl) {
-              textEl.textContent = msg;
-              textEl.dataset.base = msg;
-            }
+            if (textEl) { textEl.textContent = msg; textEl.dataset.base = msg; }
             setStatus('loading', `${msg} (Audio ${i + 1}/${files.length})`);
           });
 
@@ -2133,11 +1338,8 @@
             <div class="err-detail">${escHtml(err.stack || '(sin stack trace)')}</div>
           `;
           box.appendChild(errDiv);
-          if (isCancel) {
-            showToast('⏹️ Transcripción cancelada.');
-          } else {
-            showToast(`❌ Fallo: ${err.message.slice(0, 80)}`);
-          }
+          if (isCancel) showToast('⏹️ Transcripción cancelada.');
+          else showToast(`❌ Fallo: ${err.message.slice(0, 80)}`);
           if (isCancel) break;
         } finally {
           clearInterval(timerInt);
@@ -2171,13 +1373,11 @@
       }
 
       console.log(`[Chunked] ${totalMB} MB → ${chunks.length} parte(s)`);
-
       let full = '';
       for (let i = 0; i < chunks.length; i++) {
         if (globalTranscriptionController && globalTranscriptionController.signal.aborted) {
           throw new Error('Cancelado por el usuario.');
         }
-
         const chunkMB = (chunks[i].blob.size / (1024 * 1024)).toFixed(2);
         if (onProgress) onProgress(`Transcribiendo parte ${i + 1} de ${chunks.length} (${chunkMB} MB)...`);
 
@@ -2236,30 +1436,24 @@
           console.error(`[Whisper] ❌ Error ${response.status} con key ${keyPreview}: ${errMsg}`);
 
           if (response.status === 401 || response.status === 403) {
-            lastError = new Error(`API Key inválida o revocada (${response.status}). Genera nuevas keys en console.groq.com/keys`);
+            lastError = new Error(`API Key inválida o revocada (${response.status}).`);
             continue;
           }
-
           if (response.status === 429) {
             lastError = new Error(`Rate Limit alcanzado (429): ${errMsg}`);
             await delay(3000);
             continue;
           }
-
           if (response.status >= 500) {
             lastError = new Error(`Error del servidor Groq (${response.status}): ${errMsg}`);
             await delay(2000);
             continue;
           }
-
           throw new Error(`HTTP ${response.status}: ${errMsg}`);
-
         } catch (err) {
           console.error(`[Whisper] Excepción con key ${keyPreview}:`, err.message);
           lastError = err;
-
           if (err.message.includes('cancelada')) throw err;
-
           if (err.message.startsWith('Error de red') || err.message.includes('timeout')) {
             await delay(1500);
             continue;
@@ -2270,9 +1464,8 @@
       throw new Error(`Todas las ${GROQ_KEYS.length} API Keys fallaron. Último: ${lastError?.message || 'Desconocido'}`);
     }
 
-    // ═══════════════════ SYSTEM PROMPTS POR MODO ═══════════════════
+    // ═══════════════════ SYSTEM PROMPTS ═══════════════════
     function getSystemPromptForMode(mode, isLanguageFocus) {
-
       const REGLAS_COMUNES = `Eres el motor de IA de "Meeting Mind". Actúas como un TUTOR EXPERTO y CORRECTOR ACADÉMICO SENIOR. Tu única misión es transformar transcripciones crudas (imperfectas, con errores, con ideas a medias) en notas profesionalmente impecables, listas para estudiar, repasar o ejecutar.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -2325,83 +1518,76 @@ REGLAS UNIVERSALES (obligatorias en TODOS los modos)
 MODO ACTIVO: ACADÉMICO con ENFOQUE EN CLASE DE IDIOMAS
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-PERFIL DEL USUARIO: Estudiante de idiomas que quiere repasar su clase con precisión gramatical y de vocabulario.
+PERFIL: Estudiante de idiomas que quiere repasar su clase con precisión gramatical y de vocabulario.
 
-ROL ESPECÍFICO: Actúas como TUTOR Y PROFESOR DE IDIOMAS EXPERTO. Dominas gramática normativa, fonética, fonología y didáctica de segundas lenguas.
+ROL: TUTOR Y PROFESOR DE IDIOMAS EXPERTO. Dominas gramática normativa, fonética, fonología y didáctica.
 
-REGLAS ESPECIALES DE ESTE MODO:
+REGLAS ESPECIALES:
 
-A) CORRECCIÓN AUTOMÁTICA DE LA TRANSCRIPCIÓN:
-   • El Whisper de la app puede haber escrito palabras mal. CORRÍGELAS a su forma correcta en el idioma que se enseña.
-   • Ejemplos:
-     – Transcripción: "gouing tu de jardin" → Correcto: "going to the garden".
-     – Transcripción: "cómo se dice arbol en inglés" → Correcto: "árbol" (tilde en español).
+A) CORRECCIÓN AUTOMÁTICA:
+   • Corrige palabras mal escritas por Whisper (ej: "gouing tu de jardin" → "going to the garden").
+   • Corrige "arbol" → "árbol", "ingles" → "inglés", etc.
 
 B) ANÁLISIS DE ERRORES DEL ALUMNO:
-   • Si el alumno pronunció o dijo algo mal y el profesor lo corrigió, regístralo.
    • Formato: "Dijiste: X → Correcto: Y (explicación breve)."
 
-C) FIDELIDAD AL IDIOMA DE TRABAJO:
+C) FIDELIDAD AL IDIOMA:
    • Identifica el idioma que se enseña y mantenlo consistente.
-   • Si se mezclan idiomas, separa: "Español: X / English: Y".
+   • Si se mezclan idiomas: "Español: X / English: Y".
 
 D) ESTRUCTURA OBLIGATORIA — usa EXACTAMENTE estas 5 secciones (en este orden):
 
-   1. "Explicación Didáctica del Profesor" → tipo_contenido: "parrafos"
-   2. "Vocabulario y Expresiones Clave" → tipo_contenido: "lista"
-   3. "Reglas Gramaticales y Estructuras" → tipo_contenido: "bloque"
-   4. "Corrección de Errores y Tips de Pronunciación" → tipo_contenido: "lista"
-   5. "Guía de Repaso Rápido" → tipo_contenido: "lista"
+   1. "Explicación Didáctica del Profesor" → "parrafos"
+   2. "Vocabulario y Expresiones Clave" → "lista"
+   3. "Reglas Gramaticales y Estructuras" → "bloque"
+   4. "Corrección de Errores y Tips de Pronunciación" → "lista"
+   5. "Guía de Repaso Rápido" → "lista"
 
-E) PROHIBIDO:
-   • Inventar reglas gramaticales que no se mencionaron.
-   • Añadir vocabulario no presente en la transcripción.
-   • Crear ejercicios de temas NO cubiertos en la clase.
+E) PROHIBIDO: inventar reglas, añadir vocabulario ausente, crear ejercicios fuera del tema.
 
-Ahora genera el JSON con esas 5 secciones exactas.`;
+Genera el JSON con esas 5 secciones exactas.`;
       }
 
       const REGLAS_MODO = {
-
         academico: `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 MODO ACTIVO: ACADÉMICO — Apuntes de Clase / Estudio
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-PERFIL DEL USUARIO: Estudiante universitario que repasará estos apuntes para un examen.
+PERFIL: Estudiante universitario que repasará estos apuntes para un examen.
 
-ESTRUCTURA SUGERIDA (adáptala según el contenido real; omite las que no apliquen):
-  1. "📌 Tema Central" ..................... parrafos
-  2. "🧠 Conceptos y Definiciones" ......... lista
-  3. "🧮 Fórmulas y Datos Clave" ........... bloque
-  4. "📝 Desarrollo Explicativo" ........... parrafos
-  5. "⚠️ Correcciones al Audio" ........... lista
-  6. "✅ Tareas y Asignaciones" ............ lista
+ESTRUCTURA SUGERIDA (adáptala; omite las que no apliquen):
+  1. "📌 Tema Central" ............... parrafos
+  2. "🧠 Conceptos y Definiciones" ... lista
+  3. "🧮 Fórmulas y Datos Clave" ..... bloque
+  4. "📝 Desarrollo Explicativo" ..... parrafos
+  5. "⚠️ Correcciones al Audio" ..... lista
+  6. "✅ Tareas y Asignaciones" ...... lista
 
 REGLAS ESPECIALES:
-  • Antepón la versión correcta y menciona la errónea entre paréntesis: "F = m·a (audio: F = m/a)".
-  • En fórmulas: respeta orden de operaciones, unidades del SI y símbolos correctos.
-  • En fechas históricas: verifica el año exacto; si el audio dudó, escribe "año exacto: XXXX (audio dudó)".`,
+  • Antepón la versión correcta y menciona la errónea: "F = m·a (audio: F = m/a)".
+  • Respeta orden de operaciones, unidades del SI y símbolos correctos.
+  • En fechas: verifica el año exacto; si el audio dudó, escribe "año exacto: XXXX (audio dudó)".`,
 
         ejecutivo: `
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 MODO ACTIVO: EJECUTIVO — Reunión de Negocio / Trabajo
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-PERFIL DEL USUARIO: Profesional que necesita un acta ejecutiva accionable.
+PERFIL: Profesional que necesita un acta ejecutiva accionable.
 
 ESTRUCTURA SUGERIDA:
-  1. "📝 Resumen Ejecutivo" ................ parrafos
-  2. "💡 Puntos Clave" ..................... lista
-  3. "🎯 Decisiones y Acuerdos" ............ lista
-  4. "✅ Elementos de Acción" .............. lista (formato: "Tarea — Responsable — Fecha")
-  5. "📊 Métricas y Cifras" ................ bloque
-  6. "⚠️ Aclaraciones y Correcciones" ..... lista
+  1. "📝 Resumen Ejecutivo" .......... parrafos
+  2. "💡 Puntos Clave" ............... lista
+  3. "🎯 Decisiones y Acuerdos" ...... lista
+  4. "✅ Elementos de Acción" ........ lista (formato: "Tarea — Responsable — Fecha")
+  5. "📊 Métricas y Cifras" .......... bloque
+  6. "⚠️ Aclaraciones y Correcciones" lista
 
 REGLAS ESPECIALES:
-  • Corrige siglas mal dichas: "KPI", "ROI" (no deletreadas).
+  • Corrige siglas mal dichas: "KPI", "ROI".
   • Unifica cifras: "treinta por ciento" → "30%".
-  • Si no se mencionó responsable/fecha, escribe "por asignar" / "sin definir" — NUNCA inventes.
+  • Si no se mencionó responsable/fecha: "por asignar" / "sin definir" — NUNCA inventes.
   • Concisión ejecutiva, cero relleno.`,
 
         libre: `
@@ -2409,18 +1595,18 @@ REGLAS ESPECIALES:
 MODO ACTIVO: LIBRE — Reflexión / Podcast / Conversación
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-PERFIL DEL USUARIO: Persona que quiere rescatar ideas y citas valiosas.
+PERFIL: Persona que quiere rescatar ideas y citas valiosas.
 
 ESTRUCTURA SUGERIDA:
-  1. "📝 Resumen General" .................. parrafos
-  2. "💡 Ideas Principales" ................ lista
-  3. "💭 Citas Destacadas" ................. bloque
-  4. "📌 Notas y Matices" .................. lista
-  5. "🌱 Reflexiones Sugeridas" ............ lista
+  1. "📝 Resumen General" ............ parrafos
+  2. "💡 Ideas Principales" .......... lista
+  3. "💭 Citas Destacadas" ........... bloque
+  4. "📌 Notas y Matices" ............ lista
+  5. "🌱 Reflexiones Sugeridas" ...... lista
 
 REGLAS ESPECIALES:
   • RESPETA la voz del autor. No conviertas charla informal en ensayo académico.
-  • Corrige SOLO errores factuales objetivos. NO toques interpretaciones subjetivas.
+  • Corrige SOLO errores factuales objetivos.
   • Citas TEXTUALES entre comillas. Si el audio estaba distorsionado: "[audio confuso]".`
       };
 
@@ -2428,7 +1614,69 @@ REGLAS ESPECIALES:
       return `${REGLAS_COMUNES}\n\n${reglasEspecificas}`;
     }
 
-    // ═══════════════════ JSON → Markdown ═══════════════════
+    // ═══════════════════ 🔮 GEMINI CALL ═══════════════════
+    async function callGemini(systemPrompt, userContent, timeoutMs) {
+      const apiKey = GEMINI_API_KEY;
+
+      if (!isValidGeminiKey(apiKey)) {
+        throw new Error('Gemini API Key no configurada. Ve a ⚙️ Configuración → 🔮 Gemini API Key y pega tu key (empieza por "AIza").');
+      }
+
+      const model = memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-1.5-flash';
+      const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKey}`;
+
+      const payload = {
+        contents: [{
+          parts: [{ text: systemPrompt + '\n\n' + userContent }]
+        }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+          maxOutputTokens: 8192
+        }
+      };
+
+      const response = await fetchWithTimeout(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }, timeoutMs || 120000);
+
+      if (response.ok) {
+        const data = await response.json();
+        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) return text;
+        // A veces Gemini devuelve la respuesta bloqueada
+        const reason = data?.candidates?.[0]?.finishReason;
+        if (reason) throw new Error(`Gemini no devolvió texto (finishReason: ${reason}).`);
+        throw new Error('Respuesta vacía de Gemini.');
+      }
+
+      let errMsg = `HTTP ${response.status}`;
+      try {
+        const errData = await response.json();
+        errMsg = errData?.error?.message || errMsg;
+      } catch (_) {}
+
+      if (response.status === 400) {
+        if (errMsg.toLowerCase().includes('api key') || errMsg.toLowerCase().includes('api_key')) {
+          throw new Error('Gemini API Key inválida o malformada.');
+        }
+        throw new Error(`Solicitud inválida a Gemini: ${errMsg}`);
+      }
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Gemini API Key sin permisos o revocada.');
+      }
+      if (response.status === 429) {
+        throw new Error('Límite de Gemini alcanzado. Espera un minuto e inténtalo de nuevo.');
+      }
+      if (response.status >= 500) {
+        throw new Error(`Error del servidor de Gemini (${response.status}). Inténtalo de nuevo.`);
+      }
+      throw new Error(`Gemini: ${errMsg}`);
+    }
+
+    // ═══════════════════ JSON → MARKDOWN ═══════════════════
     function jsonNotesToMarkdown(obj) {
       if (!obj || typeof obj !== 'object') return '';
 
@@ -2456,10 +1704,7 @@ REGLAS ESPECIALES:
         } else if (tipo === 'parrafos') {
           for (const item of contenido) {
             const text = String(item).trim();
-            if (text) {
-              lines.push(text);
-              lines.push('');
-            }
+            if (text) { lines.push(text); lines.push(''); }
           }
         } else if (tipo === 'bloque') {
           for (const item of contenido) {
@@ -2488,9 +1733,7 @@ REGLAS ESPECIALES:
 
       try {
         const parsed = JSON.parse(cleaned);
-        if (parsed && typeof parsed === 'object' && (parsed.titulo_principal || parsed.secciones)) {
-          return parsed;
-        }
+        if (parsed && typeof parsed === 'object' && (parsed.titulo_principal || parsed.secciones)) return parsed;
       } catch (e) {
         const firstBrace = cleaned.indexOf('{');
         const lastBrace = cleaned.lastIndexOf('}');
@@ -2514,9 +1757,7 @@ REGLAS ESPECIALES:
       try { localStorage.setItem(LS_KEY_CHECKBOX, JSON.stringify(s)); } catch (e) {}
     }
     function toggleCheckboxState(key, checked) {
-      const s = getCheckboxState();
-      s[key] = checked;
-      saveCheckboxState(s);
+      const s = getCheckboxState(); s[key] = checked; saveCheckboxState(s);
     }
 
     function renderMarkdownToHTML(markdown, noteKey) {
@@ -2532,7 +1773,6 @@ REGLAS ESPECIALES:
           marked.setOptions({ gfm: true, breaks: true, headerIds: false, mangle: false });
           html = marked.parse(clean);
         } catch (e) {
-          console.warn('marked falló, usando fallback:', e);
           html = fallbackMarkdownRenderer(clean);
         }
       } else {
@@ -2567,32 +1807,24 @@ REGLAS ESPECIALES:
           out.push(`<li><input type="checkbox"${checked ? ' checked' : ''}> ${inline(cb[2])}</li>`);
           continue;
         }
-
         const h = t.match(/^(#{1,6})\s+(.+)$/);
-        if (h) {
-          closeLists();
-          out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`);
-          continue;
-        }
+        if (h) { closeLists(); out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); continue; }
 
         if (/^[-*+]\s+/.test(t)) {
           if (!inList || listType !== 'ul') { closeLists(); out.push('<ul>'); inList = true; listType = 'ul'; }
           out.push(`<li>${inline(t.replace(/^[-*+]\s+/, ''))}</li>`);
           continue;
         }
-
         if (/^\d+[.)]\s+/.test(t)) {
           if (!inList || listType !== 'ol') { closeLists(); out.push('<ol>'); inList = true; listType = 'ol'; }
           out.push(`<li>${inline(t.replace(/^\d+[.)]\s+/, ''))}</li>`);
           continue;
         }
-
         if (/^>\s?/.test(t)) {
           closeLists();
           out.push(`<blockquote>${inline(t.replace(/^>\s?/, ''))}</blockquote>`);
           continue;
         }
-
         closeLists();
         out.push(`<p>${inline(t)}</p>`);
       }
@@ -2603,7 +1835,6 @@ REGLAS ESPECIALES:
     function postProcessCheckboxes(html, noteKey) {
       const temp = document.createElement('div');
       temp.innerHTML = html;
-
       const stored = getCheckboxState();
       let idx = 0;
 
@@ -2616,28 +1847,21 @@ REGLAS ESPECIALES:
         const li = cb.closest('li');
         if (li) {
           li.classList.add('notion-check-item');
-
           if (!li.querySelector('.notion-check-text')) {
             const span = document.createElement('span');
             span.className = 'notion-check-text';
             let node = cb.nextSibling;
-            while (node) {
-              const next = node.nextSibling;
-              span.appendChild(node);
-              node = next;
-            }
+            while (node) { const next = node.nextSibling; span.appendChild(node); node = next; }
             li.innerHTML = '';
             li.appendChild(cb);
             li.appendChild(span);
           }
-
           const saved = stored[id];
           const finalChecked = (typeof saved === 'boolean') ? saved : cb.checked;
           cb.checked = finalChecked;
           li.classList.toggle('notion-checked', finalChecked);
         }
       });
-
       return temp.innerHTML;
     }
 
@@ -2655,7 +1879,7 @@ REGLAS ESPECIALES:
       });
     }
 
-    // ═══════════════════ ANALYZE (con chunking) ═══════════════════
+    // ═══════════════════ ANALYZE (SIN CHUNKING — GEMINI 1.5 FLASH) ═══════════════════
     async function analyzeText(text, notesContainer, options) {
       const systemPrompt = getSystemPromptForMode(
         options.categoria,
@@ -2666,87 +1890,49 @@ REGLAS ESPECIALES:
       notesContainer.innerHTML = `
         <div class="state-msg">
           <span class="big">✨</span>
-          <span id="notion-progress">Generando notas estilo Notion…</span>
+          <span id="notion-progress">Generando notas con Gemini…</span>
         </div>
       `;
-      setStatus('loading', 'Generando notas con IA…');
-
-      const currentModel = memoriaTemporal.obtener(LS_KEY_MODEL) || 'llama-3.1-70b-versatile';
+      setStatus('loading', 'Generando notas con Gemini…');
 
       try {
-        const totalWords = String(text || '').trim().split(/\s+/).filter(Boolean).length;
-        const chunks = splitIntoWordChunks(text, WORDS_PER_CHUNK);
-
-        console.log(`[analyzeText] ${totalWords} palabras → ${chunks.length} chunk(s) de ${WORDS_PER_CHUNK}`);
-
-        if (chunks.length === 0) {
-          throw new Error('La transcripción está vacía.');
-        }
-
-        const partialResults = [];
-        const progressEl = document.getElementById('notion-progress');
-
-        for (let i = 0; i < chunks.length; i++) {
-          if (progressEl) {
-            progressEl.textContent = chunks.length > 1
-              ? `Procesando bloque ${i + 1} de ${chunks.length}…`
-              : 'Procesando respuesta del modelo…';
-          }
-          if (chunks.length > 1) {
-            setStatus('loading', `Analizando bloque ${i + 1}/${chunks.length}…`);
-          }
-
-          const userMessage = `${options.isLanguageFocus
-            ? 'Enfoque adicional: CLASE DE IDIOMAS. Aplica las 5 secciones obligatorias de idiomas.\n\n'
-            : ''}Contexto del audio: ${options.contexto.join(', ')}
+        const userMessage = `${options.isLanguageFocus
+          ? 'Enfoque adicional: CLASE DE IDIOMAS. Aplica las 5 secciones obligatorias de idiomas.\n\n'
+          : ''}Contexto del audio: ${options.contexto.join(', ')}
 Enfoque principal: ${options.enfoque.join(', ')}
 
-${chunks.length > 1
-  ? `(Este es el bloque ${i + 1} de ${chunks.length} de la transcripción completa. Genera notas SOLO de este bloque, sin mencionar los otros.)\n\n`
-  : ''}TRANSCRIPCIÓN CRUDA:
+TRANSCRIPCIÓN COMPLETA:
 """
-${chunks[i]}
+${text}
 """
 
 Genera las notas AHORA en JSON estricto según el esquema indicado.`;
 
-          const payload = {
-            model: currentModel,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userMessage }
-            ],
-            temperature: 0.2,
-            max_tokens: 4096,
-            response_format: { type: 'json_object' }
-          };
+        const rawResponse = await callGemini(systemPrompt, userMessage, 180000);
 
-          const rawResponse = await callGroqChat(payload);
-          const jsonNotes = tryParseNotesJson(rawResponse);
+        const jsonNotes = tryParseNotesJson(rawResponse);
+        let markdownNotes, docTitle;
 
-          if (jsonNotes) {
-            partialResults.push(jsonNotes);
-          } else {
-            console.warn(`[analyzeText] Bloque ${i + 1} no devolvió JSON válido, se omite.`);
-          }
-
-          if (i < chunks.length - 1) {
-            await delay(2000);
-          }
+        if (jsonNotes) {
+          markdownNotes = jsonNotesToMarkdown(jsonNotes);
+          docTitle = jsonNotes.titulo_principal || 'Apuntes de la sesión';
+        } else {
+          console.warn('[analyze] Gemini no devolvió JSON válido. Usando fallback markdown.');
+          markdownNotes = rawResponse.trim()
+            .replace(/^```(?:markdown|md)?\s*\n?/i, '')
+            .replace(/\n?```\s*$/i, '')
+            .trim();
+          const titleMatch = markdownNotes.match(/^#\s+(.+)$/m)
+            || markdownNotes.match(/^###\s+[^\n]+/m);
+          docTitle = titleMatch
+            ? (titleMatch[1] || titleMatch[0]).replace(/[*_`#]/g, '').trim()
+            : 'Apuntes de la sesión';
         }
-
-        if (partialResults.length === 0) {
-          throw new Error('El modelo no devolvió notas válidas en ningún bloque.');
-        }
-
-        const mergedNotes = mergeJsonNotes(partialResults);
-        const markdownNotes = jsonNotesToMarkdown(mergedNotes);
-        const docTitle = mergedNotes.titulo_principal || 'Apuntes de la sesión';
 
         renderNotionNotes(markdownNotes, notesContainer, docTitle);
 
-        setStatus('active', '✨ Notas Notion generadas');
-        showToast(`✅ Notas listas (${chunks.length} bloque${chunks.length > 1 ? 's' : ''})`);
+        setStatus('active', '✨ Notas generadas con Gemini');
+        showToast('✅ Notas listas');
         document.querySelector('[data-tab="notas"]')?.click();
 
       } catch (err) {
@@ -2770,7 +1956,6 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
       currentNotionMarkdown = markdown;
 
       const html = renderMarkdownToHTML(markdown, currentNoteKey);
-
       const projects = getProjects();
       const projectOptionsHtml = projects.length
         ? projects.map(p => `<option value="${escHtml(p.id)}">${escHtml(p.nombre)}</option>`).join('')
@@ -2827,63 +2012,6 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
         if (!pid) { showToast('⚠️ Crea o selecciona un proyecto primero.'); return; }
         saveNotionNoteToProject(pid, docTitle || 'Apuntes');
       });
-    }
-
-    async function callGroqChat(payload) {
-      const dynamicModels = await fetchAvailableModels();
-      const modelsToTry = [...new Set([payload.model, ...dynamicModels])].filter(Boolean);
-
-      let lastError = null;
-      const maxAttempts = modelsToTry.length * GROQ_KEYS.length;
-      let attemptCount = 0;
-
-      for (const model of modelsToTry) {
-        const currentPayload = { ...payload, model };
-        for (let ka = 0; ka < GROQ_KEYS.length; ka++) {
-          if (attemptCount >= maxAttempts) break;
-          attemptCount++;
-          const apiKey = getNextGroqKey();
-          try {
-            const response = await fetchWithTimeout(GROQ_CHAT_URL, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${apiKey}`
-              },
-              body: JSON.stringify(currentPayload)
-            }, 60000);
-
-            if (response.ok) {
-              const data = await response.json();
-              const content = data?.choices?.[0]?.message?.content;
-              if (content) return content;
-              throw new Error('Respuesta vacía del modelo');
-            }
-
-            let errMsg = `HTTP ${response.status}`;
-            try {
-              const errData = await response.json();
-              errMsg = errData?.error?.message || errMsg;
-            } catch (_) {}
-
-            if (response.status === 429) {
-              lastError = new Error(`[Rate Limit] ${errMsg}`);
-              await delay(2000 * (ka + 1));
-              continue;
-            }
-            lastError = new Error(errMsg);
-            break;
-          } catch (err) {
-            lastError = err;
-            if (err.message.startsWith('Error de red') || err.message.includes('timeout')) {
-              await delay(1500 * (ka + 1));
-              continue;
-            }
-            break;
-          }
-        }
-      }
-      throw new Error(`Todos los modelos y claves fallaron. Último: ${lastError?.message || 'Desconocido'}`);
     }
 
     function resetSession() {
@@ -3054,9 +2182,7 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
         <div id="notas-guardadas-list">${notasHtml}</div>
       `;
 
-      container.querySelectorAll('.notion-content').forEach(el => {
-        attachNotionCheckboxListeners(el);
-      });
+      container.querySelectorAll('.notion-content').forEach(el => attachNotionCheckboxListeners(el));
 
       document.getElementById('btn-back-projects').addEventListener('click', () => {
         currentOpenProjectId = null;
@@ -3074,7 +2200,7 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
       if (btnGlobal) btnGlobal.addEventListener('click', () => generateGlobalSummary(project));
     }
 
-    // ═══════════════════ GLOBAL SUMMARY (con chunking) ═══════════════════
+    // ═══════════════════ GLOBAL SUMMARY (SIN CHUNKING — GEMINI) ═══════════════════
     async function generateGlobalSummary(project) {
       const notas = Array.isArray(project.notas) ? project.notas : [];
       if (!notas.length) { showToast('⚠️ No hay notas para resumir.'); return; }
@@ -3083,92 +2209,22 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
         `--- APUNTES DEL ${formatFecha(n.fecha)} (${n.title || 'Sin título'}) ---\n\n${n.markdown || ''}`
       ).join('\n\n');
 
-      openModal(`🧠 Resumen Global — ${project.nombre}`, 'Generando resumen global con Groq…');
-      const model = memoriaTemporal.obtener(LS_KEY_MODEL) || 'llama-3.1-70b-versatile';
+      openModal(`🧠 Resumen Global — ${project.nombre}`, 'Generando resumen con Gemini…');
 
       const systemPrompt = `Eres un asistente experto. Recibirás varias notas Markdown de distintas sesiones de un mismo proyecto. Genera un "Resumen Global" en Markdown bien estructurado.
 REGLAS:
 - Usa H1 para el título, H2 para secciones, H3 para subtemas.
 - Incluye secciones: Resumen, Temas recurrentes, Decisiones clave, Elementos de acción (usa checkboxes Markdown "- [ ] tarea").
 - No inventes información. Solo sintetiza lo que está en las notas.
-- Devuelve ÚNICAMENTE Markdown, sin explicaciones.`;
+- Devuelve ÚNICAMENTE Markdown, sin explicaciones ni bloques de código.`;
 
       const modalContent = document.getElementById('modal-content');
 
       try {
-        const chunks = splitIntoWordChunks(combined, WORDS_PER_CHUNK);
-        console.log(`[globalSummary] ${chunks.length} chunk(s) de ${WORDS_PER_CHUNK} palabras`);
+        const userContent = `Estas son las notas del proyecto "${project.nombre}":\n\n${combined}`;
+        const rawMd = await callGemini(systemPrompt, userContent, 180000);
 
-        const partialSummaries = [];
-
-        for (let i = 0; i < chunks.length; i++) {
-          if (modalContent) {
-            modalContent.textContent = chunks.length > 1
-              ? `Generando resumen global… bloque ${i + 1} de ${chunks.length}`
-              : 'Generando resumen global con Groq…';
-          }
-
-          const userMessage = chunks.length > 1
-            ? `(Este es el bloque ${i + 1} de ${chunks.length} del conjunto de notas. Resume SOLO este bloque, sin mencionar los otros.)\n\n${chunks[i]}`
-            : chunks[i];
-
-          const payload = {
-            model,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: userMessage }
-            ],
-            temperature: 0.3,
-            max_tokens: 2048
-          };
-
-          const result = await callGroqChat(payload);
-          if (result && result.trim()) {
-            partialSummaries.push(result.trim());
-          }
-
-          if (i < chunks.length - 1) {
-            await delay(2000);
-          }
-        }
-
-        if (partialSummaries.length === 0) {
-          throw new Error('No se generó ningún resumen.');
-        }
-
-        let finalMd = '';
-
-        if (partialSummaries.length === 1) {
-          finalMd = partialSummaries[0];
-        } else {
-          if (modalContent) modalContent.textContent = 'Fusionando resúmenes parciales…';
-
-          const fusionPrompt = `Recibirás varios resúmenes parciales de un mismo proyecto. Fusíonálos en UN ÚNICO resumen global coherente, sin repetir información.
-REGLAS:
-- Usa H1 para el título, H2 para secciones, H3 para subtemas.
-- Incluye: Resumen, Temas recurrentes, Decisiones clave, Elementos de acción (con "- [ ] tarea").
-- No inventes información.
-- Devuelve ÚNICAMENTE Markdown, sin explicaciones.`;
-
-          const fusionPayload = {
-            model,
-            messages: [
-              { role: 'system', content: fusionPrompt },
-              {
-                role: 'user',
-                content: partialSummaries
-                  .map((s, i) => `--- RESUMEN PARCIAL ${i + 1} ---\n\n${s}`)
-                  .join('\n\n')
-              }
-            ],
-            temperature: 0.3,
-            max_tokens: 4096
-          };
-
-          finalMd = await callGroqChat(fusionPayload);
-        }
-
-        const md = finalMd.trim()
+        const md = rawMd.trim()
           .replace(/^```(?:markdown|md)?\s*\n?/i, '')
           .replace(/\n?```\s*$/i, '')
           .trim();
@@ -3179,9 +2235,7 @@ REGLAS:
 
       } catch (err) {
         console.error('Error generando resumen global:', err);
-        if (modalContent) {
-          modalContent.textContent = `⚠️ Error: ${err.message}`;
-        }
+        if (modalContent) modalContent.textContent = `⚠️ Error: ${err.message}`;
       }
     }
 
