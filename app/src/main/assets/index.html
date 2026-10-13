@@ -75,7 +75,6 @@
     .btn-secondary { background: var(--bg); color: var(--text); border: 2px solid var(--border); }
     .btn-secondary:active { border-color: var(--accent); background: rgba(255, 122, 0, 0.05); }
     .btn-danger { background: transparent; color: var(--error); border: 2px solid var(--error); }
-    #btn-analyze { width: 100%; padding: 16px; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--accent), #E0551F); box-shadow: 0 4px 14px rgba(255, 122, 0, 0.32); letter-spacing: 0.04em; min-height: 52px; }
     #btn-start-record { width: 100%; padding: 16px; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, var(--accent), #E0551F); box-shadow: 0 4px 14px rgba(255, 122, 0, 0.32); letter-spacing: 0.04em; min-height: 52px; }
     #btn-start-record.recording { background: var(--error); animation: pulse 1.4s ease-in-out infinite; box-shadow: 0 4px 18px rgba(255, 92, 92, 0.4); }
     @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 92, 92, 0.55); } 50% { box-shadow: 0 0 0 10px rgba(255, 92, 92, 0); } }
@@ -87,6 +86,22 @@
     #status-dot.error .dot { background: var(--error); box-shadow: 0 0 8px var(--error); }
     @keyframes blink { 50% { opacity: 0; } }
 
+    /* 🔥 NUEVO — Aviso de Wake Lock */
+    #wake-lock-notice {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      color: var(--gold);
+      padding: 5px 12px;
+      border-radius: 99px;
+      border: 1px solid rgba(245, 166, 35, 0.4);
+      background: rgba(245, 166, 35, 0.08);
+      margin-top: 6px;
+      animation: fadeIn 0.3s ease;
+    }
+    #wake-lock-notice.show { display: inline-flex; }
+
     .tabs { display: flex; border-top: 1px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .tab { flex: 1; min-width: 100px; padding: 14px 10px; text-align: center; font-size: 0.82rem; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.25s ease; background: none; border-top: none; border-left: none; border-right: none; white-space: nowrap; touch-action: manipulation; }
     .tab:active { background: rgba(255, 122, 0, 0.04); }
@@ -95,7 +110,33 @@
     .tab-pane { display: none; padding: 16px; min-height: 180px; }
     .tab-pane.active { display: block; animation: fadeSlide 0.2s ease; }
 
-    #transcript-box { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; min-height: 120px; font-size: 0.9rem; line-height: 1.7; color: var(--text); white-space: pre-wrap; word-break: break-word; max-height: 50vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    /* 🔥 NUEVO — Progress messages en un área separada */
+    #transcript-progress-area {
+      min-height: 0;
+      margin-bottom: 10px;
+    }
+    #transcript-progress-area:empty { display: none; }
+
+    /* 🔥 NUEVO — Textarea editable de transcripción */
+    #transcript-box {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 14px 16px;
+      min-height: 200px;
+      font-size: 0.9rem;
+      line-height: 1.7;
+      color: var(--text);
+      font-family: var(--font);
+      resize: vertical;
+      outline: none;
+      -webkit-user-select: text;
+      user-select: text;
+      box-sizing: border-box;
+    }
+    #transcript-box:focus { border-color: var(--accent); }
+    #transcript-box::placeholder { color: var(--muted); font-style: italic; }
 
     .notes-header { display: flex; justify-content: space-between; margin-bottom: 16px; gap: 10px; flex-wrap: wrap; align-items: center; }
     .notes-header-left, .notes-header-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -333,15 +374,13 @@
         <button class="btn btn-danger" id="btn-clear" style="display:none;">🗑️</button>
       </div>
 
-      <div class="btn-row" style="margin-top: 8px;">
-        <button class="btn btn-primary" id="btn-analyze" style="display:none;">✨ Generar Notas Inteligentes</button>
-      </div>
-
       <input type="file" id="file-input"
              accept="audio/*,.flac,.mp3,.mp4,.mpeg,.mpga,.m4a,.ogg,.wav,.webm"
              multiple />
 
-      <div id="status-dot"><span class="dot"></span><span id="status-text">Listo. Sube o graba un audio.</span></div>
+      <div id="status-dot"><span class="dot"></span><span id="status-text">Listo. Elige un modo y empieza.</span></div>
+
+      <div id="wake-lock-notice">💡 Pantalla mantenida encendida por seguridad</div>
     </div>
 
     <div class="tabs">
@@ -352,10 +391,25 @@
 
     <div class="tab-pane active" id="tab-transcripcion">
       <div class="notes-header">
-        <button id="btn-copy-transcript" class="btn-copy-notion">📋 Copiar Todo</button>
+        <button id="btn-copy-transcript" class="btn-copy-notion">📋 Copiar</button>
       </div>
-      <div id="transcript-box">
-        <span style="color:var(--muted)">La transcripción aparecerá aquí...</span>
+
+      <!-- 🔥 Progress messages (fuera de la caja editable) -->
+      <div id="transcript-progress-area"></div>
+
+      <!-- 🔥 Textarea editable -->
+      <textarea id="transcript-box"
+                placeholder="La transcripción aparecerá aquí... También puedes PEGAR tu propia transcripción y pulsar 'Analizar Texto Pegado'."
+                spellcheck="false"></textarea>
+
+      <!-- 🔥 Botón para analizar texto pegado -->
+      <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+        <button id="btn-analyze-pasted" class="btn btn-primary" style="flex:1; min-width:180px;">
+          ✨ Analizar Texto Pegado
+        </button>
+        <button id="btn-clear-transcript" class="btn btn-danger" style="padding:11px 16px;" title="Borrar transcripción">
+          🗑️
+        </button>
       </div>
     </div>
 
@@ -363,7 +417,7 @@
       <div id="notes-container">
         <div class="state-msg">
           <span class="big">✨</span>
-          <span>Sube tus audios primero y luego pulsa "Generar Notas Inteligentes".</span>
+          <span>Graba o sube un audio, y las notas se generarán automáticamente.</span>
         </div>
       </div>
     </div>
@@ -375,61 +429,30 @@
 
   <div id="toast"></div>
 
-  <div class="modal-overlay" id="prompt-modal">
-    <div class="modal-box prompt-modal-box">
-      <h3>✨ Configurar Notas con IA</h3>
-      <p class="modal-subtitle">Elige el tipo de contenido y qué quieres que la IA extraiga del audio.</p>
+  <!-- 🔥 NUEVO — Modal de selección de enfoque antes de grabar/subir -->
+  <div class="modal-overlay" id="mode-select-modal">
+    <div class="modal-box" style="max-width: 480px;">
+      <h3>🎯 ¿Qué enfoque de notas deseas?</h3>
+      <p class="modal-subtitle">Elige el tipo de contenido para esta sesión. Las notas se generarán <strong>automáticamente</strong> al terminar la transcripción.</p>
 
-      <div class="prompt-step">
-        <label class="prompt-step-label">
-          <span class="prompt-step-num">1</span>
-          Categoría principal
-        </label>
-        <div class="prompt-cat-chips" id="prompt-cat-chips">
-          <button type="button" class="prompt-cat-chip" data-cat="academico">
-            <span class="cat-emoji">🎓</span> Académico
-          </button>
-          <button type="button" class="prompt-cat-chip" data-cat="ejecutivo">
-            <span class="cat-emoji">💼</span> Ejecutivo
-          </button>
-          <button type="button" class="prompt-cat-chip" data-cat="libre">
-            <span class="cat-emoji">📝</span> Libre
-          </button>
-        </div>
-
-        <div id="language-focus-wrapper" style="display:none; margin-top:12px;">
-          <label class="prompt-check" style="width:100%;">
-            <input type="checkbox" id="language-focus-toggle">
-            <span class="prompt-check-box"></span>
-            <span class="prompt-check-label">
-              🌐 Enfoque en Clase de Idiomas / Aprendizaje
-            </span>
-          </label>
-          <div style="font-size:0.72rem; color:var(--muted); margin-top:6px; line-height:1.5;">
-            Actívalo si la clase es de un idioma. La IA corregirá pronunciación, vocabulario y gramática, y estructurará las notas como guía de estudio.
-          </div>
-        </div>
-      </div>
-
-      <div class="prompt-step" id="prompt-context-step" style="display:none;">
-        <label class="prompt-step-label">
-          <span class="prompt-step-num">2</span>
-          Contexto del audio
-        </label>
-        <div class="prompt-check-grid" id="prompt-context-grid"></div>
-      </div>
-
-      <div class="prompt-step" id="prompt-focus-step" style="display:none;">
-        <label class="prompt-step-label">
-          <span class="prompt-step-num">3</span>
-          Enfoque principal
-        </label>
-        <div class="prompt-check-grid" id="prompt-focus-grid"></div>
+      <div class="prompt-cat-chips" id="mode-select-chips" style="grid-template-columns: repeat(2, 1fr);">
+        <button type="button" class="prompt-cat-chip" data-mode="academico">
+          <span class="cat-emoji">🎓</span> Académico
+        </button>
+        <button type="button" class="prompt-cat-chip" data-mode="idiomas">
+          <span class="cat-emoji">🌐</span> Idiomas
+        </button>
+        <button type="button" class="prompt-cat-chip" data-mode="ejecutivo">
+          <span class="cat-emoji">💼</span> Ejecutivo
+        </button>
+        <button type="button" class="prompt-cat-chip" data-mode="libre">
+          <span class="cat-emoji">📝</span> Libre
+        </button>
       </div>
 
       <div class="prompt-actions">
-        <button type="button" class="prompt-btn prompt-btn-secondary" id="prompt-cancel">Cancelar</button>
-        <button type="button" class="prompt-btn prompt-btn-primary" id="prompt-process" disabled>✨ Procesar con IA</button>
+        <button type="button" class="prompt-btn prompt-btn-secondary" id="mode-select-cancel">Cancelar</button>
+        <button type="button" class="prompt-btn prompt-btn-primary" id="mode-select-confirm" disabled>Comenzar</button>
       </div>
     </div>
   </div>
@@ -452,7 +475,6 @@
     const LS_KEY_GEMINI_API = 'meetingmind_gemini_api_key';
     const LS_KEY_GEMINI_MODEL = 'meetingmind_gemini_model';
 
-    // 🔥 NUEVO — Endpoint de la Interactions API
     const GEMINI_INTERACTIONS_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
     const GEMINI_API_REVISION = '2026-05-20';
 
@@ -491,7 +513,7 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🎙️ GROQ — Solo para Whisper (transcripción de audio)
+    // 🎙️ GROQ — Solo para Whisper
     // ═══════════════════════════════════════════════════════════════
     const GROQ_KEYS_DEFAULT = [
       "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",
@@ -553,51 +575,39 @@
     const GROQ_MODELS_URL = 'https://api.groq.com/openai/v1/models';
 
     const LS_KEY_PROJECTS = 'meetingmind_projects';
-    const LS_KEY_MODE = 'meetingmind_analysis_mode';
     const LS_KEY_CHECKBOX = 'meetingmind_notion_checkboxes';
 
-    const PROMPT_CATEGORIES = {
+    // ═══════════════════════════════════════════════════════════════
+    // 📋 DEFINICIONES DE MODOS (para el modal y para el análisis)
+    // ═══════════════════════════════════════════════════════════════
+    const MODE_DEFINITIONS = {
       academico: {
-        label: 'Académico', emoji: '🎓',
-        context: [
-          { value: 'Clase Teórica', label: 'Clase Teórica', emoji: '📖' },
-          { value: 'Laboratorio Práctico', label: 'Laboratorio Práctico', emoji: '🔬' },
-          { value: 'Seminario', label: 'Seminario', emoji: '💬' },
-          { value: 'Conferencia', label: 'Conferencia', emoji: '🎤' }
-        ],
-        focus: [
-          { value: 'Extraer Fórmulas y Cálculos', label: 'Extraer Fórmulas/Cálculos', emoji: '🧮' },
-          { value: 'Conceptos Clave', label: 'Conceptos Clave', emoji: '🧠' },
-          { value: 'Asignaciones', label: 'Asignaciones', emoji: '📋' }
-        ]
+        categoria: 'academico',
+        categoriaLabel: 'Académico',
+        contexto: ['Clase Teórica'],
+        enfoque: ['Conceptos Clave', 'Extraer Fórmulas y Cálculos'],
+        isLanguageFocus: false
+      },
+      idiomas: {
+        categoria: 'academico',
+        categoriaLabel: 'Idiomas',
+        contexto: ['Clase de Idioma'],
+        enfoque: ['Vocabulario Nuevo', 'Gramática'],
+        isLanguageFocus: true
       },
       ejecutivo: {
-        label: 'Ejecutivo', emoji: '💼',
-        context: [
-          { value: 'Reunión de Avance', label: 'Reunión de Avance', emoji: '📈' },
-          { value: 'Lluvia de Ideas', label: 'Lluvia de Ideas', emoji: '💡' },
-          { value: 'Entrevista', label: 'Entrevista', emoji: '🎤' },
-          { value: 'Reunión Técnica', label: 'Reunión Técnica', emoji: '🛠️' }
-        ],
-        focus: [
-          { value: 'Acuerdos', label: 'Acuerdos', emoji: '🤝' },
-          { value: 'Tareas Pendientes', label: 'Tareas Pendientes', emoji: '✅' },
-          { value: 'Decisiones Clave', label: 'Decisiones Clave', emoji: '🎯' }
-        ]
+        categoria: 'ejecutivo',
+        categoriaLabel: 'Ejecutivo',
+        contexto: ['Reunión de Avance'],
+        enfoque: ['Acuerdos', 'Tareas Pendientes', 'Decisiones Clave'],
+        isLanguageFocus: false
       },
       libre: {
-        label: 'Libre', emoji: '📝',
-        context: [
-          { value: 'Podcast / Radio', label: 'Podcast / Radio', emoji: '📻' },
-          { value: 'Conversación Libre', label: 'Conversación Libre', emoji: '💬' },
-          { value: 'Reflexión Personal', label: 'Reflexión Personal', emoji: '🌱' },
-          { value: 'Otro', label: 'Otro', emoji: '🗂️' }
-        ],
-        focus: [
-          { value: 'Resumen General', label: 'Resumen General', emoji: '📌' },
-          { value: 'Citas Destacadas', label: 'Citas Destacadas', emoji: '💭' },
-          { value: 'Ideas Principales', label: 'Ideas Principales', emoji: '💡' }
-        ]
+        categoria: 'libre',
+        categoriaLabel: 'Libre',
+        contexto: ['Conversación Libre'],
+        enfoque: ['Resumen General', 'Ideas Principales'],
+        isLanguageFocus: false
       }
     };
 
@@ -668,21 +678,71 @@
       obtener(c) { try { return localStorage.getItem(c); } catch (e) { return this.datos[c] || null; } }
     };
 
-    let accumulatedTranscript = '';
+    // ═══════════════════════════════════════════════════════════════
+    // 📝 ESTADO GLOBAL
+    // ═══════════════════════════════════════════════════════════════
     let currentNotionMarkdown = '';
     let currentNoteKey = '';
     let currentOpenProjectId = null;
-    let currentMode = 'ejecutivo';
+    let currentSessionMode = null;   // 🔥 modo activo para esta sesión
 
     let micStream = null;
     let currentRecorder = null;
     let isRecordingActive = false;
     let recordingChunkInterval = null;
+    let isTranscribing = false;      // 🔥 evita auto-análisis durante cancelaciones
 
-    let promptModalState = {
-      categoria: null, contexto: [], enfoque: [], isLanguageFocus: false
+    let modeSelectState = {
+      mode: null,
+      pendingAction: null   // 'record' | 'upload'
     };
 
+    // 🔥 Wake Lock
+    let wakeLock = null;
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🔥 WAKE LOCK API — Evita que la pantalla se apague
+    // ═══════════════════════════════════════════════════════════════
+    async function requestWakeLock() {
+      const notice = document.getElementById('wake-lock-notice');
+      try {
+        if (!('wakeLock' in navigator)) {
+          console.warn('[WakeLock] API no soportada');
+          return false;
+        }
+        if (wakeLock) return true;
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => {
+          console.log('[WakeLock] Liberado por el sistema');
+          wakeLock = null;
+        });
+        console.log('[WakeLock] ✅ Activo');
+        if (notice) notice.classList.add('show');
+        return true;
+      } catch (err) {
+        console.warn('[WakeLock] ❌ Error:', err.message);
+        wakeLock = null;
+        return false;
+      }
+    }
+
+    async function releaseWakeLock() {
+      const notice = document.getElementById('wake-lock-notice');
+      try {
+        if (wakeLock) {
+          await wakeLock.release();
+          wakeLock = null;
+          console.log('[WakeLock] Liberado manualmente');
+        }
+      } catch (err) {
+        console.warn('[WakeLock] Error al liberar:', err.message);
+      }
+      if (notice) notice.classList.remove('show');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🚀 INIT
+    // ═══════════════════════════════════════════════════════════════
     window.addEventListener('DOMContentLoaded', () => {
       try { initUI(); } catch (err) { alert('Error al inicializar: ' + err.message); }
     });
@@ -693,20 +753,21 @@
       const geminiModelSelect = document.getElementById('gemini-model-select');
       const btnStartRecord = document.getElementById('btn-start-record');
       const btnUpload = document.getElementById('btn-upload');
-      const btnAnalyze = document.getElementById('btn-analyze');
       const btnClear = document.getElementById('btn-clear');
+      const btnAnalyzePasted = document.getElementById('btn-analyze-pasted');
+      const btnClearTranscript = document.getElementById('btn-clear-transcript');
       const fileInput = document.getElementById('file-input');
+      const transcriptBox = document.getElementById('transcript-box');
       const tabs = document.querySelectorAll('.tab');
       const tabPanes = document.querySelectorAll('.tab-pane');
 
-      // ── Gemini: UI ──
+      // ── Gemini UI ──
       const geminiKeyInput = document.getElementById('gemini-key-input');
       const geminiKeyStatus = document.getElementById('gemini-key-status');
       geminiKeyInput.value = (GEMINI_API_KEY && GEMINI_API_KEY !== GEMINI_API_KEY_DEFAULT && isValidGeminiKey(GEMINI_API_KEY))
         ? GEMINI_API_KEY
         : '';
 
-      // 🔥 Modelo por defecto: gemini-3.8-flash
       const GEMINI_MODEL_DEFAULT = 'gemini-3.8-flash';
       const savedModel = memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL);
       const modelExists = savedModel && [...geminiModelSelect.options].some(o => o.value === savedModel);
@@ -743,11 +804,6 @@
           const apiKeyClean = String(GEMINI_API_KEY || '').trim();
           const modelClean = String(model || 'gemini-3.8-flash').trim().replace(/^models\//, '');
 
-          const testPayload = {
-            model: modelClean,
-            input: 'Responde exactamente con el texto: OK'
-          };
-
           const res = await fetchWithTimeout(GEMINI_INTERACTIONS_URL, {
             method: 'POST',
             headers: {
@@ -755,7 +811,10 @@
               'x-goog-api-key': apiKeyClean,
               'Api-Revision': GEMINI_API_REVISION
             },
-            body: JSON.stringify(testPayload)
+            body: JSON.stringify({
+              model: modelClean,
+              input: 'Responde exactamente con el texto: OK'
+            })
           }, 30000);
 
           if (res.ok) {
@@ -781,7 +840,7 @@
         }
       });
 
-      // ── Groq keys (Whisper) ──
+      // ── Groq keys ──
       const keysInput = document.getElementById('groq-keys-input');
       const keysStatus = document.getElementById('keys-save-status');
       keysInput.value = GROQ_KEYS.join('\n');
@@ -812,9 +871,9 @@
         showToast('↺ Keys restauradas');
       });
 
-      currentMode = memoriaTemporal.obtener(LS_KEY_MODE) || 'ejecutivo';
       btnConfig.addEventListener('click', () => configPanel.classList.toggle('open'));
 
+      // ── Tabs ──
       tabs.forEach(tab => {
         tab.addEventListener('click', () => {
           tabs.forEach(t => t.classList.remove('active'));
@@ -828,25 +887,19 @@
         });
       });
 
+      // 🔥 FIX — Botón Grabar: abre modal primero, o detiene si ya está grabando
       btnStartRecord.addEventListener('click', () => {
-        if (isRecordingActive) stopRecordingProcess();
-        else startRecordingProcess();
+        if (isRecordingActive) {
+          stopRecordingProcess();
+        } else {
+          openModeSelectModal('record');
+        }
       });
 
+      // 🔥 FIX — Botón Subir: abre modal primero
       btnUpload.addEventListener('click', () => {
         if (isRecordingActive) { showToast('Detén la grabación primero.'); return; }
-        setStatus('loading', 'Abriendo selector de archivos…');
-        fileInput.click();
-        setTimeout(() => {
-          if (!isRecordingActive && !globalTranscriptionController) {
-            setStatus('idle', 'Listo. Sube o graba un audio.');
-          }
-        }, 1500);
-      });
-
-      btnAnalyze.addEventListener('click', () => {
-        if (!accumulatedTranscript.trim()) { showToast('⚠️ No hay transcripción disponible.'); return; }
-        openPromptModal();
+        openModeSelectModal('upload');
       });
 
       btnClear.addEventListener('click', () => {
@@ -866,7 +919,7 @@
           }
         }
         try {
-          await handleMultipleAudioFiles(files, document.getElementById('transcript-box'));
+          await handleMultipleAudioFiles(files);
         } catch (err) {
           showToast(`❌ Error: ${err.message}`);
           setStatus('error', 'Error al procesar');
@@ -874,12 +927,38 @@
         }
       });
 
+      // 🔥 Copiar transcripción
       document.getElementById('btn-copy-transcript').addEventListener('click', () => {
-        const text = accumulatedTranscript.trim();
+        const text = transcriptBox.value.trim();
         if (!text) { showToast('⚠️ No hay texto para copiar'); return; }
         navigator.clipboard.writeText(text)
           .then(() => showToast('✅ Transcripción copiada'))
           .catch(() => showToast('⚠️ Error al copiar'));
+      });
+
+      // 🔥 NUEVO — Analizar texto pegado manualmente
+      btnAnalyzePasted.addEventListener('click', async () => {
+        const text = transcriptBox.value.trim();
+        if (!text || text.length < 20) {
+          showToast('⚠️ Pega primero un texto para analizar (mínimo 20 caracteres).');
+          return;
+        }
+
+        // Si no hay modo elegido → pedirlo
+        if (!currentSessionMode) {
+          openModeSelectModal('analyze-pasted');
+          return;
+        }
+        await triggerAutoAnalysis();
+      });
+
+      // 🔥 NUEVO — Limpiar transcripción manualmente
+      btnClearTranscript.addEventListener('click', () => {
+        if (!transcriptBox.value.trim()) return;
+        if (confirm('¿Borrar la transcripción actual?')) {
+          transcriptBox.value = '';
+          setStatus('idle', 'Listo. Elige un modo y empieza.');
+        }
       });
 
       document.getElementById('btn-close-modal').addEventListener('click', closeModal);
@@ -887,7 +966,9 @@
         if (e.target.id === 'modal-overlay') closeModal();
       });
 
-      initPromptModalListeners();
+      // 🔥 Modal de selección de modo
+      initModeSelectModalListeners();
+
       renderProjectsTab();
 
       document.getElementById('btn-export-data').addEventListener('click', () => {
@@ -971,141 +1052,77 @@
       }
     }
 
-    function initPromptModalListeners() {
-      const modal = document.getElementById('prompt-modal');
-      const chips = document.querySelectorAll('#prompt-cat-chips .prompt-cat-chip');
-      const btnCancel = document.getElementById('prompt-cancel');
-      const btnProcess = document.getElementById('prompt-process');
+    // ═══════════════════════════════════════════════════════════════
+    // 🎯 MODAL DE SELECCIÓN DE MODO
+    // ═══════════════════════════════════════════════════════════════
+    function initModeSelectModalListeners() {
+      const modal = document.getElementById('mode-select-modal');
+      const chips = document.querySelectorAll('#mode-select-chips .prompt-cat-chip');
+      const btnCancel = document.getElementById('mode-select-cancel');
+      const btnConfirm = document.getElementById('mode-select-confirm');
 
       chips.forEach(chip => {
         chip.addEventListener('click', () => {
-          const cat = chip.dataset.cat;
-          promptModalState.categoria = cat;
+          const mode = chip.dataset.mode;
+          modeSelectState.mode = mode;
           chips.forEach(c => c.classList.toggle('selected', c === chip));
-          renderPromptChecklists(cat);
-          updatePromptProcessButton();
-
-          const langWrapper = document.getElementById('language-focus-wrapper');
-          const langToggle = document.getElementById('language-focus-toggle');
-          if (cat === 'academico') {
-            if (langWrapper) langWrapper.style.display = 'block';
-          } else {
-            if (langWrapper) langWrapper.style.display = 'none';
-            if (langToggle) langToggle.checked = false;
-            promptModalState.isLanguageFocus = false;
-          }
+          btnConfirm.disabled = !mode;
         });
       });
 
-      const langToggle = document.getElementById('language-focus-toggle');
-      if (langToggle) {
-        langToggle.addEventListener('change', () => {
-          promptModalState.isLanguageFocus = !!langToggle.checked;
-        });
-      }
+      btnCancel.addEventListener('click', () => {
+        modeSelectState = { mode: null, pendingAction: null };
+        modal.classList.remove('open');
+      });
 
-      btnCancel.addEventListener('click', closePromptModal);
       modal.addEventListener('click', (e) => {
-        if (e.target.id === 'prompt-modal') closePromptModal();
+        if (e.target.id === 'mode-select-modal') {
+          modeSelectState = { mode: null, pendingAction: null };
+          modal.classList.remove('open');
+        }
       });
 
-      btnProcess.addEventListener('click', () => {
-        if (!promptModalState.categoria) { showToast('⚠️ Elige una categoría primero.'); return; }
-        if (!promptModalState.contexto.length) { showToast('⚠️ Selecciona al menos un contexto.'); return; }
-        if (!promptModalState.enfoque.length) { showToast('⚠️ Selecciona al menos un enfoque.'); return; }
-        const opts = {
-          categoria: promptModalState.categoria,
-          categoriaLabel: PROMPT_CATEGORIES[promptModalState.categoria].label,
-          contexto: [...promptModalState.contexto],
-          enfoque: [...promptModalState.enfoque],
-          isLanguageFocus: promptModalState.isLanguageFocus === true
-        };
-        closePromptModal();
-        analyzeText(accumulatedTranscript.trim(), document.getElementById('notes-container'), opts);
+      btnConfirm.addEventListener('click', () => {
+        const mode = modeSelectState.mode;
+        const action = modeSelectState.pendingAction;
+        if (!mode) return;
+
+        // Guardar el modo elegido como modo de la sesión actual
+        currentSessionMode = mode;
+        const modeDef = MODE_DEFINITIONS[mode];
+        showToast(`🎯 Modo: ${modeDef.categoriaLabel}`);
+
+        // Cerrar modal
+        modal.classList.remove('open');
+        modeSelectState = { mode: null, pendingAction: null };
+
+        // Ejecutar la acción pendiente
+        if (action === 'record') {
+          startRecordingProcess();
+        } else if (action === 'upload') {
+          document.getElementById('file-input').click();
+        } else if (action === 'analyze-pasted') {
+          triggerAutoAnalysis();
+        }
       });
     }
 
-    function openPromptModal() {
-      promptModalState = { categoria: null, contexto: [], enfoque: [], isLanguageFocus: false };
-      document.querySelectorAll('#prompt-cat-chips .prompt-cat-chip').forEach(c => c.classList.remove('selected'));
-      document.getElementById('prompt-context-grid').innerHTML = '';
-      document.getElementById('prompt-focus-grid').innerHTML = '';
-      document.getElementById('prompt-context-step').style.display = 'none';
-      document.getElementById('prompt-focus-step').style.display = 'none';
-      document.getElementById('prompt-process').disabled = true;
-
-      const langWrapper = document.getElementById('language-focus-wrapper');
-      const langToggle = document.getElementById('language-focus-toggle');
-      if (langWrapper) langWrapper.style.display = 'none';
-      if (langToggle) langToggle.checked = false;
-
-      document.getElementById('prompt-modal').classList.add('open');
+    function openModeSelectModal(action) {
+      modeSelectState = { mode: currentSessionMode, pendingAction: action };
+      const chips = document.querySelectorAll('#mode-select-chips .prompt-cat-chip');
+      chips.forEach(c => c.classList.toggle('selected', c.dataset.mode === currentSessionMode));
+      document.getElementById('mode-select-confirm').disabled = !currentSessionMode;
+      document.getElementById('mode-select-modal').classList.add('open');
     }
 
-    function closePromptModal() {
-      document.getElementById('prompt-modal').classList.remove('open');
-    }
-
-    function renderPromptChecklists(catKey) {
-      const data = PROMPT_CATEGORIES[catKey];
-      if (!data) return;
-
-      const ctxGrid = document.getElementById('prompt-context-grid');
-      const focusGrid = document.getElementById('prompt-focus-grid');
-
-      ctxGrid.innerHTML = data.context.map(item => `
-        <label class="prompt-check">
-          <input type="checkbox" data-type="contexto" value="${escHtml(item.value)}">
-          <span class="prompt-check-box"></span>
-          <span class="prompt-check-label">${item.emoji || ''} ${escHtml(item.label)}</span>
-        </label>
-      `).join('');
-
-      focusGrid.innerHTML = data.focus.map(item => `
-        <label class="prompt-check">
-          <input type="checkbox" data-type="enfoque" value="${escHtml(item.value)}">
-          <span class="prompt-check-box"></span>
-          <span class="prompt-check-label">${item.emoji || ''} ${escHtml(item.label)}</span>
-        </label>
-      `).join('');
-
-      document.getElementById('prompt-context-step').style.display = 'block';
-      document.getElementById('prompt-focus-step').style.display = 'block';
-
-      ctxGrid.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-        cb.addEventListener('change', () => {
-          const val = cb.value;
-          const arr = promptModalState.contexto;
-          const idx = arr.indexOf(val);
-          if (cb.checked && idx === -1) arr.push(val);
-          else if (!cb.checked && idx !== -1) arr.splice(idx, 1);
-          updatePromptProcessButton();
-        });
-      });
-
-      focusGrid.querySelectorAll('input[type="checkbox"]').forEach(cb => {
-        cb.addEventListener('change', () => {
-          const val = cb.value;
-          const arr = promptModalState.enfoque;
-          const idx = arr.indexOf(val);
-          if (cb.checked && idx === -1) arr.push(val);
-          else if (!cb.checked && idx !== -1) arr.splice(idx, 1);
-          updatePromptProcessButton();
-        });
-      });
-
-      updatePromptProcessButton();
-    }
-
-    function updatePromptProcessButton() {
-      const btn = document.getElementById('prompt-process');
-      const ok = promptModalState.categoria && promptModalState.contexto.length > 0 && promptModalState.enfoque.length > 0;
-      btn.disabled = !ok;
-    }
-
-    // ═══════════════════ GRABACIÓN ═══════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // 🎙️ GRABACIÓN
+    // ═══════════════════════════════════════════════════════════════
     async function startRecordingProcess() {
       if (isRecordingActive) return;
+
+      // 🔥 Wake Lock
+      await requestWakeLock();
 
       if (window.AndroidNative && typeof window.AndroidNative.startRecording === 'function') {
         try {
@@ -1121,6 +1138,7 @@
           isRecordingActive = false;
           resetRecordButton();
           enableAllButtons();
+          releaseWakeLock();
         }
         return;
       }
@@ -1142,6 +1160,7 @@
         isRecordingActive = false;
         resetRecordButton();
         enableAllButtons();
+        releaseWakeLock();
       }
     }
 
@@ -1154,7 +1173,7 @@
         if (!chunks.length) return;
         const blob = new Blob(chunks, { type: 'audio/webm' });
         const file = new File([blob], `record_${Date.now()}.webm`, { type: 'audio/webm' });
-        transcribeRecordedChunk(file);
+        await transcribeRecordedChunk(file);
       };
       currentRecorder.start();
       recordingChunkInterval = setTimeout(() => {
@@ -1165,40 +1184,12 @@
       }, 300000);
     }
 
-    async function transcribeRecordedChunk(file) {
-      const box = document.getElementById('transcript-box');
-      const id = 'temp_' + Date.now();
-      const ind = document.createElement('div');
-      ind.id = id;
-      ind.className = 'transcript-progress';
-      ind.innerHTML = '<span class="spinner"></span><span class="progress-text">Transcribiendo bloque de audio...</span>';
-      box.appendChild(ind);
-      try {
-        const transcript = await transcribeWithGroqChunked(file, (msg) => {
-          const t = ind.querySelector('.progress-text');
-          if (t) t.textContent = msg;
-          setStatus('loading', msg);
-        });
-        if (transcript && transcript.trim()) {
-          accumulatedTranscript += (accumulatedTranscript.trim() ? '\n\n' : '') + transcript.trim();
-          box.textContent = accumulatedTranscript;
-          showAnalyzeUI();
-        }
-      } catch (err) {
-        const errDiv = document.createElement('div');
-        errDiv.className = 'transcript-error';
-        errDiv.innerHTML = `<span class="err-title">❌ Fallo al transcribir bloque</span>${escHtml(err.message)}`;
-        box.appendChild(errDiv);
-        showToast(`❌ Fallo al transcribir bloque: ${err.message.slice(0, 80)}`);
-      } finally {
-        const el = document.getElementById(id);
-        if (el) el.remove();
-      }
-    }
-
     function stopRecordingProcess() {
       if (!isRecordingActive) return;
       isRecordingActive = false;
+
+      // 🔥 Liberar Wake Lock
+      releaseWakeLock();
 
       if (window.AndroidNative && typeof window.AndroidNative.stopRecording === 'function') {
         setStatus('loading', 'Procesando grabación nativa…');
@@ -1210,8 +1201,7 @@
       if (currentRecorder && currentRecorder.state !== 'inactive') currentRecorder.stop();
       if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
       resetRecordButton();
-      setStatus('idle', 'Grabación finalizada.');
-      enableAllButtons();
+      setStatus('loading', 'Procesando grabación…');
     }
 
     function resetRecordButton() {
@@ -1274,6 +1264,7 @@
       } finally {
         isRecordingActive = false;
         enableAllButtons();
+        releaseWakeLock();
       }
     };
 
@@ -1283,17 +1274,71 @@
       resetRecordButton();
       setStatus('error', message || 'Error en grabación nativa');
       enableAllButtons();
+      releaseWakeLock();
     };
 
-    function showAnalyzeUI() {
-      document.getElementById('btn-analyze').style.display = 'flex';
-      document.getElementById('btn-clear').style.display = 'block';
+    // ═══════════════════════════════════════════════════════════════
+    // ✍️ TRANSCRIPCIÓN — Escribe en el textarea
+    // ═══════════════════════════════════════════════════════════════
+    function appendToTranscript(text) {
+      const box = document.getElementById('transcript-box');
+      if (!box || !text) return;
+      const current = box.value.trim();
+      box.value = current ? (current + '\n\n' + text.trim()) : text.trim();
     }
 
-    // ═══════════════════ TRANSCRIPCIÓN MÚLTIPLE (GROQ WHISPER) ═══════════════════
-    async function handleMultipleAudioFiles(files, box) {
+    function setTranscriptProgressHTML(html) {
+      const area = document.getElementById('transcript-progress-area');
+      if (!area) return;
+      area.innerHTML = html;
+    }
+
+    function clearTranscriptProgress() {
+      setTranscriptProgressHTML('');
+    }
+
+    async function transcribeRecordedChunk(file) {
+      const id = 'temp_' + Date.now();
+      setTranscriptProgressHTML(
+        `<div class="transcript-progress" id="${id}"><span class="spinner"></span><span class="progress-text">Transcribiendo bloque de audio...</span></div>`
+      );
+
+      try {
+        isTranscribing = true;
+        const transcript = await transcribeWithGroqChunked(file, (msg) => {
+          const el = document.getElementById(id);
+          const t = el ? el.querySelector('.progress-text') : null;
+          if (t) t.textContent = msg;
+          setStatus('loading', msg);
+        });
+
+        if (transcript && transcript.trim()) {
+          appendToTranscript(transcript.trim());
+        }
+        isTranscribing = false;
+        clearTranscriptProgress();
+
+        // 🔥 Auto-análisis después de transcribir
+        await maybeAutoAnalyze();
+
+      } catch (err) {
+        isTranscribing = false;
+        const errDiv = document.createElement('div');
+        errDiv.className = 'transcript-error';
+        errDiv.innerHTML = `<span class="err-title">❌ Fallo al transcribir bloque</span>${escHtml(err.message)}`;
+        const area = document.getElementById('transcript-progress-area');
+        if (area) area.appendChild(errDiv);
+        showToast(`❌ Fallo al transcribir bloque: ${err.message.slice(0, 80)}`);
+      } finally {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+      }
+    }
+
+    async function handleMultipleAudioFiles(files) {
       disableAllButtons();
-      if (!accumulatedTranscript.trim()) box.textContent = '';
+      const progressArea = document.getElementById('transcript-progress-area');
+      progressArea.innerHTML = '';
 
       globalTranscriptionController = new AbortController();
       const signal = globalTranscriptionController.signal;
@@ -1316,8 +1361,8 @@
         const progressEl = document.createElement('div');
         progressEl.className = 'transcript-progress';
         progressEl.innerHTML = `<span class="spinner"></span><span class="progress-text">Preparando audio ${i + 1}/${files.length}...</span>`;
-        box.appendChild(progressEl);
-        if (!box.contains(cancelBtn)) box.appendChild(cancelBtn);
+        progressArea.appendChild(progressEl);
+        if (!progressArea.contains(cancelBtn)) progressArea.appendChild(cancelBtn);
 
         const startTime = Date.now();
         const timerInt = setInterval(() => {
@@ -1338,16 +1383,13 @@
           });
 
           if (transcript && transcript.trim()) {
-            if (accumulatedTranscript.trim()) accumulatedTranscript += '\n\n';
-            accumulatedTranscript += transcript.trim();
-            box.textContent = accumulatedTranscript;
-            if (!box.contains(cancelBtn)) box.appendChild(cancelBtn);
+            appendToTranscript(transcript.trim());
             showToast(`✅ Audio ${i + 1} completado.`);
           } else {
             const emptyEl = document.createElement('div');
             emptyEl.className = 'transcript-error';
             emptyEl.innerHTML = `<span class="err-title">⚠️ Audio ${i + 1} sin texto detectable</span>El archivo puede estar silencioso, corrupto o en un formato no soportado.`;
-            box.appendChild(emptyEl);
+            progressArea.appendChild(emptyEl);
           }
         } catch (err) {
           const errDiv = document.createElement('div');
@@ -1356,12 +1398,10 @@
           errDiv.innerHTML = `
             <span class="err-title">${isCancel ? '⏹️ Cancelado' : '❌ Error al procesar "' + escHtml(file.name) + '"'}</span>
             ${escHtml(err.message)}
-            <div class="err-detail">${escHtml(err.stack || '(sin stack trace)')}</div>
           `;
-          box.appendChild(errDiv);
-          if (isCancel) showToast('⏹️ Transcripción cancelada.');
+          progressArea.appendChild(errDiv);
+          if (isCancel) { showToast('⏹️ Transcripción cancelada.'); break; }
           else showToast(`❌ Fallo: ${err.message.slice(0, 80)}`);
-          if (isCancel) break;
         } finally {
           clearInterval(timerInt);
           progressEl.remove();
@@ -1371,9 +1411,10 @@
       cancelBtn.remove();
       globalTranscriptionController = null;
 
-      if (accumulatedTranscript.trim()) {
-        showAnalyzeUI();
-        setStatus('idle', 'Audios procesados. Genera las notas.');
+      // 🔥 Auto-análisis después de subir archivos
+      const hasContent = document.getElementById('transcript-box').value.trim().length > 0;
+      if (hasContent && !signal.aborted) {
+        await maybeAutoAnalyze();
       } else {
         setStatus('error', 'No se pudo extraer texto del audio.');
       }
@@ -1383,7 +1424,6 @@
     async function transcribeWithGroqChunked(file, onProgress) {
       const CHUNK_SIZE = 10 * 1024 * 1024;
       const total = file.size;
-      const totalMB = (total / (1024 * 1024)).toFixed(2);
       const chunks = [];
       let start = 0, idx = 0;
       while (start < total) {
@@ -1393,7 +1433,6 @@
         idx++;
       }
 
-      console.log(`[Chunked] ${totalMB} MB → ${chunks.length} parte(s)`);
       let full = '';
       for (let i = 0; i < chunks.length; i++) {
         if (globalTranscriptionController && globalTranscriptionController.signal.aborted) {
@@ -1412,7 +1451,7 @@
         if (t && t.trim()) full += (full ? ' ' : '') + t.trim();
 
         if (i < chunks.length - 1) {
-          if (onProgress) onProgress(`Parte ${i + 1} OK. Esperando 5s antes de la siguiente...`);
+          if (onProgress) onProgress(`Parte ${i + 1} OK. Esperando 5s...`);
           await delay(5000);
         }
       }
@@ -1421,7 +1460,6 @@
 
     async function transcribeSingleChunk(file) {
       let lastError = null;
-      const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
 
       for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
         if (globalTranscriptionController && globalTranscriptionController.signal.aborted) {
@@ -1430,7 +1468,7 @@
 
         const apiKey = getNextGroqKey();
         const keyPreview = apiKey.slice(0, 12) + '…' + apiKey.slice(-4);
-        console.log(`[Whisper] Intento ${attempt + 1}/${GROQ_KEYS.length} | Key ${keyPreview} | File ${fileSizeMB} MB`);
+        console.log(`[Whisper] Intento ${attempt + 1}/${GROQ_KEYS.length} | Key ${keyPreview}`);
 
         const formData = new FormData();
         formData.append('file', file);
@@ -1448,13 +1486,11 @@
 
           if (response.ok) {
             const data = await response.json();
-            console.log(`[Whisper] ✅ Éxito con key ${keyPreview}. Texto: ${(data.text || '').length} chars`);
             return data.text || '';
           }
 
           const errData = await response.json().catch(() => ({}));
           const errMsg = errData?.error?.message || `HTTP ${response.status}`;
-          console.error(`[Whisper] ❌ Error ${response.status} con key ${keyPreview}: ${errMsg}`);
 
           if (response.status === 401 || response.status === 403) {
             lastError = new Error(`API Key inválida o revocada (${response.status}).`);
@@ -1472,7 +1508,6 @@
           }
           throw new Error(`HTTP ${response.status}: ${errMsg}`);
         } catch (err) {
-          console.error(`[Whisper] Excepción con key ${keyPreview}:`, err.message);
           lastError = err;
           if (err.message.includes('cancelada')) throw err;
           if (err.message.startsWith('Error de red') || err.message.includes('timeout')) {
@@ -1485,167 +1520,60 @@
       throw new Error(`Todas las ${GROQ_KEYS.length} API Keys fallaron. Último: ${lastError?.message || 'Desconocido'}`);
     }
 
-    // ═══════════════════ SYSTEM PROMPTS ═══════════════════
-    function getSystemPromptForMode(mode, isLanguageFocus) {
-      const REGLAS_COMUNES = `Eres el motor de IA de "Meeting Mind". Actúas como un TUTOR EXPERTO y CORRECTOR ACADÉMICO SENIOR. Tu única misión es transformar transcripciones crudas (imperfectas, con errores, con ideas a medias) en notas profesionalmente impecables, listas para estudiar, repasar o ejecutar.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-REGLAS UNIVERSALES (obligatorias en TODOS los modos)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-1) CORRECCIÓN Y PRECISIÓN ACADÉMICA:
-   • Si en la transcripción se dice un concepto técnico, fórmula, definición matemática, fecha, ley, nombre propio o dato de forma ERRÓNEA, CONFUSA O INCOMPLETA, NO lo repitas tal cual.
-   • CORRÍGELO a su versión académicamente correcta.
-   • Marca brevemente la corrección entre paréntesis cuando aplique: "(el audio decía: ...)".
-
-2) ENRIQUECIMIENTO EXPLICATIVO:
-   • Si una idea quedó a medias o explicada de forma enredada, REESTRUCTÚRALA y COMPLÉTALA de forma didáctica, clara y fácil de repasar.
-   • Traduce lenguaje coloquial o muletillas a lenguaje formal y preciso.
-
-3) SIN INVENTAR TEMAS AJENOS:
-   • PROHIBIDO introducir conceptos, autores, teorías, ejemplos o debates que NO fueron mencionados.
-   • Tu trabajo es PULIR y CORREGIR lo existente, no crear contenido nuevo.
-   • Si algo es inaudible o ambiguo, escribe "[inaudible]" o "[ambiguo en el audio]" — NUNCA inventes.
-
-4) FORMATO DE SALIDA — JSON ESTRICTO OBLIGATORIO:
-   Devuelve EXCLUSIVAMENTE un objeto JSON válido:
-
-   {
-     "titulo_principal": "Título descriptivo y conciso",
-     "secciones": [
-       {
-         "titulo_seccion": "Nombre de la sección",
-         "tipo_contenido": "lista",
-         "contenido": ["elemento 1", "elemento 2"]
-       }
-     ]
-   }
-
-   REGLAS ESTRICTAS DEL JSON:
-   • Devuelve SOLO el JSON. Nada de texto antes, después, ni bloques \`\`\`json.
-   • "tipo_contenido" DEBE ser exactamente: "lista" | "parrafos" | "bloque".
-   • "contenido" es SIEMPRE un array de strings, incluso si tiene un solo elemento.
-   • "lista": cada string es un ítem SIN guiones ni asteriscos.
-   • "parrafos": cada string es un párrafo completo (2-4 frases).
-   • "bloque": cada string es un fragmento destacado (fórmulas, citas, código, datos numéricos).
-   • Escapa correctamente comillas internas (\\") y saltos de línea (\\n).
-   • PROHIBIDO usar markdown dentro de los strings (** ## - \`).
-   • Tildes, ñ y símbolos matemáticos (², ³, √, π, ∫) son bienvenidos.`;
-
-      if (mode === 'academico' && isLanguageFocus === true) {
-        return `${REGLAS_COMUNES}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MODO ACTIVO: ACADÉMICO con ENFOQUE EN CLASE DE IDIOMAS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-PERFIL: Estudiante de idiomas que quiere repasar su clase con precisión gramatical y de vocabulario.
-
-ROL: TUTOR Y PROFESOR DE IDIOMAS EXPERTO. Dominas gramática normativa, fonética, fonología y didáctica.
-
-REGLAS ESPECIALES:
-
-A) CORRECCIÓN AUTOMÁTICA:
-   • Corrige palabras mal escritas por Whisper (ej: "gouing tu de jardin" → "going to the garden").
-   • Corrige "arbol" → "árbol", "ingles" → "inglés", etc.
-
-B) ANÁLISIS DE ERRORES DEL ALUMNO:
-   • Formato: "Dijiste: X → Correcto: Y (explicación breve)."
-
-C) FIDELIDAD AL IDIOMA:
-   • Identifica el idioma que se enseña y mantenlo consistente.
-   • Si se mezclan idiomas: "Español: X / English: Y".
-
-D) ESTRUCTURA OBLIGATORIA — usa EXACTAMENTE estas 5 secciones (en este orden):
-
-   1. "Explicación Didáctica del Profesor" → "parrafos"
-   2. "Vocabulario y Expresiones Clave" → "lista"
-   3. "Reglas Gramaticales y Estructuras" → "bloque"
-   4. "Corrección de Errores y Tips de Pronunciación" → "lista"
-   5. "Guía de Repaso Rápido" → "lista"
-
-E) PROHIBIDO: inventar reglas, añadir vocabulario ausente, crear ejercicios fuera del tema.
-
-Genera el JSON con esas 5 secciones exactas.`;
+    // ═══════════════════════════════════════════════════════════════
+    // 🎯 AUTO-ANÁLISIS después de transcribir
+    // ═══════════════════════════════════════════════════════════════
+    async function maybeAutoAnalyze() {
+      const text = document.getElementById('transcript-box').value.trim();
+      if (!text || text.length < 20) {
+        setStatus('error', 'Transcripción demasiado corta para generar notas.');
+        return;
+      }
+      if (!currentSessionMode) {
+        showToast('⚠️ Selecciona primero un enfoque de notas.');
+        setStatus('idle', 'Transcripción lista. Pulsa "Analizar Texto Pegado" para generar notas.');
+        return;
       }
 
-      const REGLAS_MODO = {
-        academico: `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MODO ACTIVO: ACADÉMICO — Apuntes de Clase / Estudio
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-PERFIL: Estudiante universitario que repasará estos apuntes para un examen.
-
-ESTRUCTURA SUGERIDA (adáptala; omite las que no apliquen):
-  1. "📌 Tema Central" ............... parrafos
-  2. "🧠 Conceptos y Definiciones" ... lista
-  3. "🧮 Fórmulas y Datos Clave" ..... bloque
-  4. "📝 Desarrollo Explicativo" ..... parrafos
-  5. "⚠️ Correcciones al Audio" ..... lista
-  6. "✅ Tareas y Asignaciones" ...... lista
-
-REGLAS ESPECIALES:
-  • Antepón la versión correcta y menciona la errónea: "F = m·a (audio: F = m/a)".
-  • Respeta orden de operaciones, unidades del SI y símbolos correctos.
-  • En fechas: verifica el año exacto; si el audio dudó, escribe "año exacto: XXXX (audio dudó)".`,
-
-        ejecutivo: `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MODO ACTIVO: EJECUTIVO — Reunión de Negocio / Trabajo
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-PERFIL: Profesional que necesita un acta ejecutiva accionable.
-
-ESTRUCTURA SUGERIDA:
-  1. "📝 Resumen Ejecutivo" .......... parrafos
-  2. "💡 Puntos Clave" ............... lista
-  3. "🎯 Decisiones y Acuerdos" ...... lista
-  4. "✅ Elementos de Acción" ........ lista (formato: "Tarea — Responsable — Fecha")
-  5. "📊 Métricas y Cifras" .......... bloque
-  6. "⚠️ Aclaraciones y Correcciones" lista
-
-REGLAS ESPECIALES:
-  • Corrige siglas mal dichas: "KPI", "ROI".
-  • Unifica cifras: "treinta por ciento" → "30%".
-  • Si no se mencionó responsable/fecha: "por asignar" / "sin definir" — NUNCA inventes.
-  • Concisión ejecutiva, cero relleno.`,
-
-        libre: `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MODO ACTIVO: LIBRE — Reflexión / Podcast / Conversación
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-PERFIL: Persona que quiere rescatar ideas y citas valiosas.
-
-ESTRUCTURA SUGERIDA:
-  1. "📝 Resumen General" ............ parrafos
-  2. "💡 Ideas Principales" .......... lista
-  3. "💭 Citas Destacadas" ........... bloque
-  4. "📌 Notas y Matices" ............ lista
-  5. "🌱 Reflexiones Sugeridas" ...... lista
-
-REGLAS ESPECIALES:
-  • RESPETA la voz del autor. No conviertas charla informal en ensayo académico.
-  • Corrige SOLO errores factuales objetivos.
-  • Citas TEXTUALES entre comillas. Si el audio estaba distorsionado: "[audio confuso]".`
-      };
-
-      const reglasEspecificas = REGLAS_MODO[mode] || REGLAS_MODO.academico;
-      return `${REGLAS_COMUNES}\n\n${reglasEspecificas}`;
+      const opts = getSessionOptions();
+      await analyzeText(text, document.getElementById('notes-container'), opts);
+      document.querySelector('[data-tab="notas"]')?.click();
     }
 
-    // ═══════════════════ 🔮 GEMINI — Interactions API v1beta ═══════════════════
-    /* 🔥 Extrae el texto de la respuesta (steps[].content[].text) */
+    // 🔥 Botón "Analizar Texto Pegado" — usa el modo actual
+    async function triggerAutoAnalysis() {
+      const text = document.getElementById('transcript-box').value.trim();
+      if (!text || text.length < 20) {
+        showToast('⚠️ Pega primero un texto para analizar (mínimo 20 caracteres).');
+        return;
+      }
+      if (!currentSessionMode) {
+        openModeSelectModal('analyze-pasted');
+        return;
+      }
+      const opts = getSessionOptions();
+      await analyzeText(text, document.getElementById('notes-container'), opts);
+      document.querySelector('[data-tab="notas"]')?.click();
+    }
+
+    function getSessionOptions() {
+      const mode = currentSessionMode || 'academico';
+      const def = MODE_DEFINITIONS[mode] || MODE_DEFINITIONS.academico;
+      return {
+        categoria: def.categoria,
+        categoriaLabel: def.categoriaLabel,
+        contexto: [...def.contexto],
+        enfoque: [...def.enfoque],
+        isLanguageFocus: def.isLanguageFocus === true
+      };
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🤖 GEMINI — Interactions API v1beta
+    // ═══════════════════════════════════════════════════════════════
     function extractGeminiText(data) {
       if (!data || typeof data !== 'object') return '';
-
-      // Camino 1: output_text (SDK)
-      if (typeof data.output_text === 'string' && data.output_text.trim()) {
-        return data.output_text;
-      }
-
-      // Camino 2: steps[].content[].text (REST)
+      if (typeof data.output_text === 'string' && data.output_text.trim()) return data.output_text;
       if (Array.isArray(data.steps)) {
         let text = '';
         for (const step of data.steps) {
@@ -1659,23 +1587,20 @@ REGLAS ESPECIALES:
         }
         if (text.trim()) return text;
       }
-
       return '';
     }
 
-    /* 🔥 REESCRITA — Interactions API */
     async function callGemini(systemPrompt, userContent, timeoutMs, options = {}) {
       const apiKey = String(GEMINI_API_KEY || '').trim();
 
       if (!isValidGeminiKey(apiKey)) {
-        throw new Error('Gemini API Key no configurada o inválida. Ve a ⚙️ Configuración → 🔮 Gemini API Key y pega tu key (AIza… o AQ.…).');
+        throw new Error('Gemini API Key no configurada o inválida. Ve a ⚙️ Configuración → 🔮 Gemini API Key.');
       }
 
       const currentModel = (memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-3.8-flash')
         .trim()
         .replace(/^models\//, '');
 
-      // Body de la Interactions API
       const payload = {
         model: currentModel,
         input: systemPrompt + '\n\n' + userContent
@@ -1720,16 +1645,12 @@ REGLAS ESPECIALES:
       } catch (_) {}
 
       const low = errMsg.toLowerCase();
-
       if (response.status === 400) {
         if (low.includes('api key') || low.includes('api_key') || low.includes('invalid key')) {
-          throw new Error('Gemini API Key inválida. Revisa que sea correcta (AIza… o AQ.…) y que no tenga espacios.');
+          throw new Error('Gemini API Key inválida. Revisa que sea correcta (AIza… o AQ.…).');
         }
-        if (low.includes('model') && (low.includes('not found') || low.includes('not supported') || low.includes('unsupported'))) {
+        if (low.includes('model') && (low.includes('not found') || low.includes('not supported'))) {
           throw new Error(`El modelo "${currentModel}" no está disponible. Prueba otro en ⚙️ Configuración.`);
-        }
-        if (low.includes('revision')) {
-          throw new Error('Versión de API no soportada. Actualiza la app.');
         }
         throw new Error(`Solicitud inválida a Gemini: ${errMsg}`);
       }
@@ -1737,21 +1658,146 @@ REGLAS ESPECIALES:
         throw new Error('Gemini API Key sin permisos o revocada.');
       }
       if (response.status === 404) {
-        throw new Error(`Endpoint o modelo no encontrado ("${currentModel}"). Cambia de modelo en ⚙️ Configuración.`);
+        throw new Error(`Endpoint o modelo no encontrado ("${currentModel}").`);
       }
       if (response.status === 429) {
-        throw new Error('Límite de Gemini alcanzado. Espera un minuto e inténtalo de nuevo.');
+        throw new Error('Límite de Gemini alcanzado. Espera un minuto.');
       }
       if (response.status >= 500) {
-        throw new Error(`Error del servidor de Gemini (${response.status}). Inténtalo de nuevo.`);
+        throw new Error(`Error del servidor de Gemini (${response.status}).`);
       }
       throw new Error(`Gemini: ${errMsg}`);
     }
 
-    // ═══════════════════ JSON → MARKDOWN ═══════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // 🎓 SYSTEM PROMPTS
+    // ═══════════════════════════════════════════════════════════════
+    function getSystemPromptForMode(mode, isLanguageFocus) {
+      const REGLAS_COMUNES = `Eres el motor de IA de "Meeting Mind". Actúas como un TUTOR EXPERTO y CORRECTOR ACADÉMICO SENIOR. Tu única misión es transformar transcripciones crudas en notas profesionalmente impecables.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REGLAS UNIVERSALES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1) CORRECCIÓN Y PRECISIÓN ACADÉMICA:
+   • Si en la transcripción se dice un concepto, fórmula, definición, fecha, ley o dato de forma ERRÓNEA, CONFUSA O INCOMPLETA, NO lo repitas tal cual.
+   • CORRÍGELO a su versión académicamente correcta.
+   • Marca la corrección entre paréntesis: "(el audio decía: ...)".
+
+2) ENRIQUECIMIENTO EXPLICATIVO:
+   • Si una idea quedó a medias o enredada, REESTRUCTÚRALA y COMPLÉTALA didácticamente.
+
+3) SIN INVENTAR TEMAS AJENOS:
+   • PROHIBIDO introducir conceptos, autores o teorías que NO fueron mencionados.
+   • Si algo es inaudible o ambiguo, escribe "[inaudible]".
+
+4) FORMATO DE SALIDA — JSON ESTRICTO OBLIGATORIO:
+
+   {
+     "titulo_principal": "Título descriptivo",
+     "secciones": [
+       {
+         "titulo_seccion": "Nombre de la sección",
+         "tipo_contenido": "lista",
+         "contenido": ["elemento 1", "elemento 2"]
+       }
+     ]
+   }
+
+   REGLAS DEL JSON:
+   • SOLO el JSON. Nada de texto antes ni después.
+   • "tipo_contenido": exactamente "lista" | "parrafos" | "bloque".
+   • "contenido": siempre array de strings.
+   • Escapa comillas internas (\\") y saltos de línea (\\n).
+   • PROHIBIDO usar markdown dentro de los strings.`;
+
+      if (mode === 'academico' && isLanguageFocus === true) {
+        return `${REGLAS_COMUNES}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODO: ACADÉMICO con ENFOQUE EN CLASE DE IDIOMAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ROL: TUTOR Y PROFESOR DE IDIOMAS EXPERTO.
+
+REGLAS ESPECIALES:
+A) Corrige palabras mal escritas por Whisper (ej: "gouing tu de jardin" → "going to the garden").
+B) Registra errores del alumno: "Dijiste: X → Correcto: Y (explicación).".
+C) Fidelidad al idioma que se enseña. Mezcla: "Español: X / English: Y".
+
+ESTRUCTURA OBLIGATORIA — EXACTAMENTE estas 5 secciones:
+   1. "Explicación Didáctica del Profesor" → "parrafos"
+   2. "Vocabulario y Expresiones Clave" → "lista"
+   3. "Reglas Gramaticales y Estructuras" → "bloque"
+   4. "Corrección de Errores y Tips de Pronunciación" → "lista"
+   5. "Guía de Repaso Rápido" → "lista"
+
+Genera el JSON con esas 5 secciones exactas.`;
+      }
+
+      const REGLAS_MODO = {
+        academico: `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODO: ACADÉMICO — Apuntes de Clase / Estudio
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ESTRUCTURA SUGERIDA:
+  1. "📌 Tema Central" ............... parrafos
+  2. "🧠 Conceptos y Definiciones" ... lista
+  3. "🧮 Fórmulas y Datos Clave" ..... bloque
+  4. "📝 Desarrollo Explicativo" ..... parrafos
+  5. "⚠️ Correcciones al Audio" ..... lista
+  6. "✅ Tareas y Asignaciones" ...... lista
+
+REGLAS:
+  • Antepón la versión correcta: "F = m·a (audio: F = m/a)".
+  • Respeta orden de operaciones, unidades del SI y símbolos.`,
+
+        ejecutivo: `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODO: EJECUTIVO — Reunión de Negocio / Trabajo
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ESTRUCTURA SUGERIDA:
+  1. "📝 Resumen Ejecutivo" .......... parrafos
+  2. "💡 Puntos Clave" ............... lista
+  3. "🎯 Decisiones y Acuerdos" ...... lista
+  4. "✅ Elementos de Acción" ........ lista (formato: "Tarea — Responsable — Fecha")
+  5. "📊 Métricas y Cifras" .......... bloque
+  6. "⚠️ Aclaraciones y Correcciones" lista
+
+REGLAS:
+  • Corrige siglas mal dichas: "KPI", "ROI".
+  • Unifica cifras: "treinta por ciento" → "30%".
+  • Si no hay responsable/fecha: "por asignar" / "sin definir".`,
+
+        libre: `
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODO: LIBRE — Reflexión / Podcast / Conversación
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+ESTRUCTURA SUGERIDA:
+  1. "📝 Resumen General" ............ parrafos
+  2. "💡 Ideas Principales" .......... lista
+  3. "💭 Citas Destacadas" ........... bloque
+  4. "📌 Notas y Matices" ............ lista
+  5. "🌱 Reflexiones Sugeridas" ...... lista
+
+REGLAS:
+  • RESPETA la voz del autor. No conviertas charla informal en ensayo.
+  • Corrige SOLO errores factuales objetivos.
+  • Citas TEXTUALES entre comillas.`
+      };
+
+      const reglasEspecificas = REGLAS_MODO[mode] || REGLAS_MODO.academico;
+      return `${REGLAS_COMUNES}\n\n${reglasEspecificas}`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 📝 JSON → MARKDOWN
+    // ═══════════════════════════════════════════════════════════════
     function jsonNotesToMarkdown(obj) {
       if (!obj || typeof obj !== 'object') return '';
-
       const lines = [];
       const titulo = obj.titulo_principal || obj.titulo || 'Apuntes de la sesión';
       lines.push(`# ${titulo}`);
@@ -1791,13 +1837,11 @@ REGLAS ESPECIALES:
         }
         lines.push('');
       }
-
       return lines.join('\n').trim();
     }
 
     function tryParseNotesJson(rawText) {
       if (!rawText || typeof rawText !== 'string') return null;
-
       let cleaned = rawText.trim()
         .replace(/^```(?:json)?\s*\n?/i, '')
         .replace(/\n?```\s*$/i, '')
@@ -1820,7 +1864,9 @@ REGLAS ESPECIALES:
       return null;
     }
 
-    // ═══════════════════ CHECKBOX STATE ═══════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // 📋 CHECKBOX + MARKDOWN RENDER
+    // ═══════════════════════════════════════════════════════════════
     function getCheckboxState() {
       try { return JSON.parse(localStorage.getItem(LS_KEY_CHECKBOX) || '{}'); }
       catch (e) { return {}; }
@@ -1951,7 +1997,9 @@ REGLAS ESPECIALES:
       });
     }
 
-    // ═══════════════════ ANALYZE ═══════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // ✨ ANÁLISIS CON GEMINI
+    // ═══════════════════════════════════════════════════════════════
     async function analyzeText(text, notesContainer, options) {
       const systemPrompt = getSystemPromptForMode(
         options.categoria,
@@ -1980,7 +2028,6 @@ ${text}
 
 Genera las notas AHORA en JSON estricto según el esquema indicado.`;
 
-        // 🔥 Forzar JSON
         const rawResponse = await callGemini(systemPrompt, userMessage, 180000, { responseFormat: 'json' });
 
         const jsonNotes = tryParseNotesJson(rawResponse);
@@ -2043,7 +2090,7 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
           <div class="notes-header-right">
             <button id="btn-copy-notion" class="btn-copy-notion">📋 Copiar MD</button>
             <button id="btn-download-md" class="btn-copy-notion">⬇️ .md</button>
-            <button id="btn-reconfigure" class="btn-copy-notion">🔄 Re-configurar</button>
+            <button id="btn-reconfigure" class="btn-copy-notion">🔄 Re-generar</button>
           </div>
         </div>
         <div class="notion-content" id="notion-render-target">
@@ -2073,8 +2120,9 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
       const btnReconfigure = document.getElementById('btn-reconfigure');
       if (btnReconfigure) {
         btnReconfigure.addEventListener('click', () => {
-          if (!accumulatedTranscript.trim()) { showToast('⚠️ No hay transcripción disponible.'); return; }
-          openPromptModal();
+          const text = document.getElementById('transcript-box').value.trim();
+          if (!text) { showToast('⚠️ No hay transcripción disponible.'); return; }
+          openModeSelectModal('analyze-pasted');
         });
       }
 
@@ -2088,24 +2136,24 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
     }
 
     function resetSession() {
-      accumulatedTranscript = '';
+      document.getElementById('transcript-box').value = '';
+      document.getElementById('transcript-progress-area').innerHTML = '';
       currentNotionMarkdown = '';
       currentNoteKey = '';
-      document.getElementById('transcript-box').innerHTML = '<span style="color:var(--muted)">La transcripción aparecerá aquí...</span>';
-      document.getElementById('notes-container').innerHTML = '<div class="state-msg"><span class="big">✨</span><span>Sube tus audios primero y luego pulsa "Generar Notas Inteligentes".</span></div>';
-      document.getElementById('btn-analyze').style.display = 'none';
+      document.getElementById('notes-container').innerHTML = '<div class="state-msg"><span class="big">✨</span><span>Graba o sube un audio, y las notas se generarán automáticamente.</span></div>';
       document.getElementById('btn-clear').style.display = 'none';
-      setStatus('idle', 'Listo. Sube o graba un audio.');
+      currentSessionMode = null;
+      setStatus('idle', 'Listo. Elige un modo y empieza.');
     }
 
     function disableButtonsExcept(activeBtn) {
-      ['btn-start-record', 'btn-upload', 'btn-analyze'].forEach(id => {
+      ['btn-start-record', 'btn-upload', 'btn-analyze-pasted'].forEach(id => {
         const b = document.getElementById(id);
         if (b && b !== activeBtn) b.disabled = true;
       });
     }
     function disableAllButtons() {
-      ['btn-start-record', 'btn-upload', 'btn-analyze'].forEach(id => {
+      ['btn-start-record', 'btn-upload', 'btn-analyze-pasted'].forEach(id => {
         const b = document.getElementById(id);
         if (b) b.disabled = true;
       });
@@ -2113,16 +2161,22 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
     function enableAllButtons() {
       const btnStart = document.getElementById('btn-start-record');
       const btnUpload = document.getElementById('btn-upload');
-      const btnAnalyze = document.getElementById('btn-analyze');
+      const btnAnalyze = document.getElementById('btn-analyze-pasted');
       if (btnStart) btnStart.disabled = false;
       if (btnUpload) btnUpload.disabled = false;
-      if (btnAnalyze) {
-        btnAnalyze.disabled = false;
-        if (accumulatedTranscript.trim()) btnAnalyze.style.display = 'flex';
+      if (btnAnalyze) btnAnalyze.disabled = false;
+
+      // Mostrar botón clear si hay contenido
+      const btnClear = document.getElementById('btn-clear');
+      if (btnClear) {
+        const hasContent = document.getElementById('transcript-box').value.trim().length > 0;
+        btnClear.style.display = hasContent ? 'block' : 'none';
       }
     }
 
-    // ═══════════════════ PROYECTOS ═══════════════════
+    // ═══════════════════════════════════════════════════════════════
+    // 📁 PROYECTOS
+    // ═══════════════════════════════════════════════════════════════
     function getProjects() {
       try {
         const raw = memoriaTemporal.obtener(LS_KEY_PROJECTS);
@@ -2273,7 +2327,6 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
       if (btnGlobal) btnGlobal.addEventListener('click', () => generateGlobalSummary(project));
     }
 
-    // ═══════════════════ GLOBAL SUMMARY ═══════════════════
     async function generateGlobalSummary(project) {
       const notas = Array.isArray(project.notas) ? project.notas : [];
       if (!notas.length) { showToast('⚠️ No hay notas para resumir.'); return; }
@@ -2289,7 +2342,7 @@ REGLAS:
 - Usa H1 para el título, H2 para secciones, H3 para subtemas.
 - Incluye secciones: Resumen, Temas recurrentes, Decisiones clave, Elementos de acción (usa checkboxes Markdown "- [ ] tarea").
 - No inventes información. Solo sintetiza lo que está en las notas.
-- Devuelve ÚNICAMENTE Markdown, sin explicaciones ni bloques de código.`;
+- Devuelve ÚNICAMENTE Markdown, sin explicaciones.`;
 
       const modalContent = document.getElementById('modal-content');
 
