@@ -259,15 +259,15 @@
 
     <label for="gemini-model-select">Modelo de Notas Inteligentes (Gemini)</label>
     <select id="gemini-model-select">
-  <option value="gemini-3.5-flash-lite">✨ 3.5 Flash-Lite (Respuestas más rápidas)</option>
-  <option value="gemini-3.6-flash">⚡ 3.6 Flash (Asistencia general)</option>
-  <option value="gemini-3.1-pro">🧠 3.1 Pro (Razonamiento avanzado)</option>
-</select>
+      <option value="gemini-3.8-flash">✨ 3.8 Flash (Recomendado — rápido)</option>
+      <option value="gemini-3.8-pro">🧠 3.8 Pro (Razonamiento avanzado)</option>
+      <option value="gemini-2.0-flash-exp">🚀 2.0 Flash (Experimental)</option>
+    </select>
 
     <div class="key-divider">
       <label>🔮 Gemini API Key (para Notas Inteligentes)</label>
       <p style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;line-height:1.5;">
-        Consigue tu key gratis en <strong>aistudio.google.com/app/apikey</strong>.
+        Consigue tu key gratis en <strong>aistudio.google.com/apikey</strong>.
         Puede empezar por <code style="background:rgba(135,131,120,0.15);padding:1px 5px;border-radius:3px;">AIza</code>
         o por <code style="background:rgba(135,131,120,0.15);padding:1px 5px;border-radius:3px;">AQ.</code>.
         Se guarda localmente y <strong>persiste entre actualizaciones del APK</strong>.
@@ -444,18 +444,18 @@
 
   <script>
     // ═══════════════════════════════════════════════════════════════
-    // 🔮 GEMINI — Configuración para Notas Inteligentes
+    // 🔮 GEMINI — Configuración (Interactions API v1beta)
     // ═══════════════════════════════════════════════════════════════
     // ⚠️ REEMPLAZA EL VALOR DE ABAJO POR TU API KEY REAL DE GEMINI
-    //    (puede empezar por "AIza" o por "AQ.")
     const GEMINI_API_KEY_DEFAULT = 'PEGA_AQUI_TU_API_KEY_DE_GEMINI';
 
     const LS_KEY_GEMINI_API = 'meetingmind_gemini_api_key';
     const LS_KEY_GEMINI_MODEL = 'meetingmind_gemini_model';
 
-    const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+    // 🔥 NUEVO — Endpoint de la Interactions API
+    const GEMINI_INTERACTIONS_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
+    const GEMINI_API_REVISION = '2026-05-20';
 
-    /* 🔥 FIX — Validación dual: acepta prefijo "AIza" (formato antiguo) Y "AQ." (formato nuevo) */
     function isValidGeminiKey(k) {
       if (typeof k !== 'string') return false;
       const trimmed = k.trim();
@@ -463,7 +463,6 @@
       return trimmed.startsWith('AIza') || trimmed.startsWith('AQ.');
     }
 
-    /* 🔥 FIX — Limpieza al cargar desde localStorage */
     function loadGeminiKey() {
       try {
         const stored = localStorage.getItem(LS_KEY_GEMINI_API);
@@ -477,17 +476,11 @@
 
     let GEMINI_API_KEY = loadGeminiKey();
 
-    /* 🔥 FIX — Guardado con trim() y validación dual (AIza o AQ.) */
     function saveGeminiKey(key) {
       const cleaned = (key || '').trim();
-
       if (!isValidGeminiKey(cleaned)) {
-        return {
-          ok: false,
-          error: 'La key debe empezar por "AIza" o "AQ." y tener al menos 20 caracteres.'
-        };
+        return { ok: false, error: 'La key debe empezar por "AIza" o "AQ." y tener al menos 20 caracteres.' };
       }
-
       try {
         localStorage.setItem(LS_KEY_GEMINI_API, cleaned);
         GEMINI_API_KEY = cleaned;
@@ -520,9 +513,7 @@
             return parsed;
           }
         }
-      } catch (e) {
-        console.warn('No se pudieron cargar keys guardadas:', e);
-      }
+      } catch (e) {}
       return [...GROQ_KEYS_DEFAULT];
     }
 
@@ -708,33 +699,27 @@
       const tabs = document.querySelectorAll('.tab');
       const tabPanes = document.querySelectorAll('.tab-pane');
 
-      // ── Gemini: UI de API key y modelo ──
+      // ── Gemini: UI ──
       const geminiKeyInput = document.getElementById('gemini-key-input');
       const geminiKeyStatus = document.getElementById('gemini-key-status');
-      // Mostramos la key guardada solo si es diferente al placeholder
       geminiKeyInput.value = (GEMINI_API_KEY && GEMINI_API_KEY !== GEMINI_API_KEY_DEFAULT && isValidGeminiKey(GEMINI_API_KEY))
         ? GEMINI_API_KEY
         : '';
 
-      // ✅ DESPUÉS — Default migrado a 'gemini-3.6-flash'
-// y validación: si el modelo guardado en localStorage ya no existe (ej: modelo viejo "gemini-1.5-flash"),
-// se fuerza el nuevo default y se re-guarda.
-const GEMINI_MODEL_DEFAULT = 'gemini-3.6-flash';
-const savedModel = memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL);
-
-const modelExists = savedModel && [...geminiModelSelect.options].some(o => o.value === savedModel);
-if (modelExists) {
-  geminiModelSelect.value = savedModel;
-} else {
-  // El modelo guardado ya no existe en el listado → usar el nuevo default
-  geminiModelSelect.value = GEMINI_MODEL_DEFAULT;
-  memoriaTemporal.guardar(LS_KEY_GEMINI_MODEL, GEMINI_MODEL_DEFAULT);
-}
-
-geminiModelSelect.addEventListener('change', () => {
-  memoriaTemporal.guardar(LS_KEY_GEMINI_MODEL, geminiModelSelect.value);
-  showToast('✅ Modelo: ' + geminiModelSelect.value);
-});
+      // 🔥 Modelo por defecto: gemini-3.8-flash
+      const GEMINI_MODEL_DEFAULT = 'gemini-3.8-flash';
+      const savedModel = memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL);
+      const modelExists = savedModel && [...geminiModelSelect.options].some(o => o.value === savedModel);
+      if (modelExists) {
+        geminiModelSelect.value = savedModel;
+      } else {
+        geminiModelSelect.value = GEMINI_MODEL_DEFAULT;
+        memoriaTemporal.guardar(LS_KEY_GEMINI_MODEL, GEMINI_MODEL_DEFAULT);
+      }
+      geminiModelSelect.addEventListener('change', () => {
+        memoriaTemporal.guardar(LS_KEY_GEMINI_MODEL, geminiModelSelect.value);
+        showToast('✅ Modelo: ' + geminiModelSelect.value);
+      });
 
       document.getElementById('btn-save-gemini-key').addEventListener('click', () => {
         const result = saveGeminiKey(geminiKeyInput.value);
@@ -753,27 +738,31 @@ geminiModelSelect.addEventListener('change', () => {
         geminiKeyStatus.textContent = '🧪 Probando conexión con Gemini…';
         geminiKeyStatus.style.color = 'var(--muted)';
         const model = geminiModelSelect.value;
+
         try {
+          const apiKeyClean = String(GEMINI_API_KEY || '').trim();
+          const modelClean = String(model || 'gemini-3.8-flash').trim().replace(/^models\//, '');
+
           const testPayload = {
-            contents: [{ parts: [{ text: 'Responde con el JSON: {"ok": true}' }] }],
-            generationConfig: { responseMimeType: 'application/json', temperature: 0 }
+            model: modelClean,
+            input: 'Responde exactamente con el texto: OK'
           };
-          // 🔥 FIX — trim() aplicado a la key antes de la URL
-         // ✅ DESPUÉS — Limpieza idéntica a callGemini
-const apiKeyClean = String(GEMINI_API_KEY || '').trim();
-const modelClean = String(model || 'gemini-3.6-flash').trim().replace(/^models\//, '');
-const url = `${GEMINI_API_BASE}/${modelClean}:generateContent?key=${apiKeyClean}`;
-          const res = await fetchWithTimeout(url, {
+
+          const res = await fetchWithTimeout(GEMINI_INTERACTIONS_URL, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKeyClean,
+              'Api-Revision': GEMINI_API_REVISION
+            },
             body: JSON.stringify(testPayload)
           }, 30000);
 
           if (res.ok) {
             const data = await res.json();
-            const txt = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            if (txt) {
-              geminiKeyStatus.textContent = `✅ Gemini responde correctamente con "${model}".`;
+            const txt = extractGeminiText(data);
+            if (txt && txt.trim()) {
+              geminiKeyStatus.textContent = `✅ Gemini responde correctamente con "${modelClean}".`;
               geminiKeyStatus.style.color = 'var(--success)';
               showToast('✅ Gemini OK');
             } else {
@@ -782,7 +771,7 @@ const url = `${GEMINI_API_BASE}/${modelClean}:generateContent?key=${apiKeyClean}
             }
           } else {
             const errData = await res.json().catch(() => ({}));
-            const errMsg = errData?.error?.message || `HTTP ${res.status}`;
+            const errMsg = errData?.error?.message || errData?.message || `HTTP ${res.status}`;
             geminiKeyStatus.textContent = `❌ Error ${res.status}: ${errMsg}`;
             geminiKeyStatus.style.color = 'var(--error)';
           }
@@ -1646,80 +1635,118 @@ REGLAS ESPECIALES:
       return `${REGLAS_COMUNES}\n\n${reglasEspecificas}`;
     }
 
-    /* 🔮 GEMINI CALL — Modelos 3.x + URL limpia con apiKey.trim() */
-async function callGemini(systemPrompt, userContent, timeoutMs) {
-  // 🔥 Key limpia (soporta AIza… o AQ.…)
-  const apiKey = String(GEMINI_API_KEY || '').trim();
+    // ═══════════════════ 🔮 GEMINI — Interactions API v1beta ═══════════════════
+    /* 🔥 Extrae el texto de la respuesta (steps[].content[].text) */
+    function extractGeminiText(data) {
+      if (!data || typeof data !== 'object') return '';
 
-  if (!isValidGeminiKey(apiKey)) {
-    throw new Error('Gemini API Key no configurada o inválida. Ve a ⚙️ Configuración → 🔮 Gemini API Key y pega tu key (AIza… o AQ.…).');
-  }
+      // Camino 1: output_text (SDK)
+      if (typeof data.output_text === 'string' && data.output_text.trim()) {
+        return data.output_text;
+      }
 
-  // 🔥 Modelo limpio + default 3.6 Flash
-  const currentModel = (memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-3.6-flash')
-    .trim()
-    .replace(/^models\//, '');   // ← limpia prefijo "models/" si lo pegaron por error
+      // Camino 2: steps[].content[].text (REST)
+      if (Array.isArray(data.steps)) {
+        let text = '';
+        for (const step of data.steps) {
+          if (step.type === 'model_output' && Array.isArray(step.content)) {
+            for (const block of step.content) {
+              if (block.type === 'text' && typeof block.text === 'string') {
+                text += block.text;
+              }
+            }
+          }
+        }
+        if (text.trim()) return text;
+      }
 
-  // 🔥 URL limpia con apiKey.trim() explícito
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey.trim()}`;
-
-  const payload = {
-    contents: [{
-      parts: [{ text: systemPrompt + '\n\n' + userContent }]
-    }],
-    generationConfig: {
-      responseMimeType: 'application/json',
-      temperature: 0.2,
-      maxOutputTokens: 16384          // ← ampliado: los modelos 3.x soportan más salida
+      return '';
     }
-  };
 
-  const response = await fetchWithTimeout(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  }, timeoutMs || 120000);
+    /* 🔥 REESCRITA — Interactions API */
+    async function callGemini(systemPrompt, userContent, timeoutMs, options = {}) {
+      const apiKey = String(GEMINI_API_KEY || '').trim();
 
-  if (response.ok) {
-    const data = await response.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (text) return text;
-    const reason = data?.candidates?.[0]?.finishReason;
-    if (reason) throw new Error(`Gemini no devolvió texto (finishReason: ${reason}).`);
-    throw new Error('Respuesta vacía de Gemini.');
-  }
+      if (!isValidGeminiKey(apiKey)) {
+        throw new Error('Gemini API Key no configurada o inválida. Ve a ⚙️ Configuración → 🔮 Gemini API Key y pega tu key (AIza… o AQ.…).');
+      }
 
-  let errMsg = `HTTP ${response.status}`;
-  try {
-    const errData = await response.json();
-    errMsg = errData?.error?.message || errMsg;
-  } catch (_) {}
+      const currentModel = (memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-3.8-flash')
+        .trim()
+        .replace(/^models\//, '');
 
-  if (response.status === 400) {
-    // Diferenciamos entre key inválida y modelo inválido
-    const low = errMsg.toLowerCase();
-    if (low.includes('api key') || low.includes('api_key')) {
-      throw new Error('Gemini API Key inválida. Revisa que sea correcta (AIza… o AQ.…) y que no tenga espacios.');
+      // Body de la Interactions API
+      const payload = {
+        model: currentModel,
+        input: systemPrompt + '\n\n' + userContent
+      };
+
+      if (options.responseFormat === 'json') {
+        payload.response_format = {
+          type: 'text',
+          mime_type: 'application/json'
+        };
+      }
+
+      const response = await fetchWithTimeout(GEMINI_INTERACTIONS_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+          'Api-Revision': GEMINI_API_REVISION
+        },
+        body: JSON.stringify(payload)
+      }, timeoutMs || 120000);
+
+      if (response.ok) {
+        const data = await response.json();
+        const text = extractGeminiText(data);
+        if (text && text.trim()) return text;
+
+        if (data?.status === 'failed' || data?.errors) {
+          const errDetail = data.errors ? JSON.stringify(data.errors) : data.status;
+          throw new Error(`Gemini falló: ${errDetail}`);
+        }
+        if (data?.status === 'requires_action') {
+          throw new Error('Gemini solicitó una acción (function call). No soportado.');
+        }
+        throw new Error('Respuesta vacía de Gemini.');
+      }
+
+      let errMsg = `HTTP ${response.status}`;
+      try {
+        const errData = await response.json();
+        errMsg = errData?.error?.message || errData?.message || errMsg;
+      } catch (_) {}
+
+      const low = errMsg.toLowerCase();
+
+      if (response.status === 400) {
+        if (low.includes('api key') || low.includes('api_key') || low.includes('invalid key')) {
+          throw new Error('Gemini API Key inválida. Revisa que sea correcta (AIza… o AQ.…) y que no tenga espacios.');
+        }
+        if (low.includes('model') && (low.includes('not found') || low.includes('not supported') || low.includes('unsupported'))) {
+          throw new Error(`El modelo "${currentModel}" no está disponible. Prueba otro en ⚙️ Configuración.`);
+        }
+        if (low.includes('revision')) {
+          throw new Error('Versión de API no soportada. Actualiza la app.');
+        }
+        throw new Error(`Solicitud inválida a Gemini: ${errMsg}`);
+      }
+      if (response.status === 401 || response.status === 403) {
+        throw new Error('Gemini API Key sin permisos o revocada.');
+      }
+      if (response.status === 404) {
+        throw new Error(`Endpoint o modelo no encontrado ("${currentModel}"). Cambia de modelo en ⚙️ Configuración.`);
+      }
+      if (response.status === 429) {
+        throw new Error('Límite de Gemini alcanzado. Espera un minuto e inténtalo de nuevo.');
+      }
+      if (response.status >= 500) {
+        throw new Error(`Error del servidor de Gemini (${response.status}). Inténtalo de nuevo.`);
+      }
+      throw new Error(`Gemini: ${errMsg}`);
     }
-    if (low.includes('model') && (low.includes('not found') || low.includes('not supported') || low.includes('unsupported'))) {
-      throw new Error(`El modelo "${currentModel}" no está disponible para tu API Key. Prueba con otro modelo en ⚙️ Configuración.`);
-    }
-    throw new Error(`Solicitud inválida a Gemini: ${errMsg}`);
-  }
-  if (response.status === 401 || response.status === 403) {
-    throw new Error('Gemini API Key sin permisos o revocada.');
-  }
-  if (response.status === 404) {
-    throw new Error(`Modelo "${currentModel}" no encontrado. Cambia a otro en ⚙️ Configuración.`);
-  }
-  if (response.status === 429) {
-    throw new Error('Límite de Gemini alcanzado. Espera un minuto e inténtalo de nuevo.');
-  }
-  if (response.status >= 500) {
-    throw new Error(`Error del servidor de Gemini (${response.status}). Inténtalo de nuevo.`);
-  }
-  throw new Error(`Gemini: ${errMsg}`);
-}
 
     // ═══════════════════ JSON → MARKDOWN ═══════════════════
     function jsonNotesToMarkdown(obj) {
@@ -1924,7 +1951,7 @@ async function callGemini(systemPrompt, userContent, timeoutMs) {
       });
     }
 
-    // ═══════════════════ ANALYZE (SIN CHUNKING — GEMINI 1.5 FLASH) ═══════════════════
+    // ═══════════════════ ANALYZE ═══════════════════
     async function analyzeText(text, notesContainer, options) {
       const systemPrompt = getSystemPromptForMode(
         options.categoria,
@@ -1953,7 +1980,8 @@ ${text}
 
 Genera las notas AHORA en JSON estricto según el esquema indicado.`;
 
-        const rawResponse = await callGemini(systemPrompt, userMessage, 180000);
+        // 🔥 Forzar JSON
+        const rawResponse = await callGemini(systemPrompt, userMessage, 180000, { responseFormat: 'json' });
 
         const jsonNotes = tryParseNotesJson(rawResponse);
         let markdownNotes, docTitle;
@@ -2245,7 +2273,7 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
       if (btnGlobal) btnGlobal.addEventListener('click', () => generateGlobalSummary(project));
     }
 
-    // ═══════════════════ GLOBAL SUMMARY (SIN CHUNKING — GEMINI) ═══════════════════
+    // ═══════════════════ GLOBAL SUMMARY ═══════════════════
     async function generateGlobalSummary(project) {
       const notas = Array.isArray(project.notas) ? project.notas : [];
       if (!notas.length) { showToast('⚠️ No hay notas para resumir.'); return; }
