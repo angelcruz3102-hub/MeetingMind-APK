@@ -86,19 +86,7 @@
     #status-dot.error .dot { background: var(--error); box-shadow: 0 0 8px var(--error); }
     @keyframes blink { 50% { opacity: 0; } }
 
-    #wake-lock-notice {
-      display: none;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.72rem;
-      color: var(--gold);
-      padding: 5px 12px;
-      border-radius: 99px;
-      border: 1px solid rgba(245, 166, 35, 0.4);
-      background: rgba(245, 166, 35, 0.08);
-      margin-top: 6px;
-      animation: fadeIn 0.3s ease;
-    }
+    #wake-lock-notice { display: none; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--gold); padding: 5px 12px; border-radius: 99px; border: 1px solid rgba(245, 166, 35, 0.4); background: rgba(245, 166, 35, 0.08); margin-top: 6px; animation: fadeIn 0.3s ease; }
     #wake-lock-notice.show { display: inline-flex; }
 
     .tabs { display: flex; border-top: 1px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -112,23 +100,7 @@
     #transcript-progress-area { min-height: 0; margin-bottom: 10px; }
     #transcript-progress-area:empty { display: none; }
 
-    #transcript-box {
-      width: 100%;
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 14px 16px;
-      min-height: 200px;
-      font-size: 0.9rem;
-      line-height: 1.7;
-      color: var(--text);
-      font-family: var(--font);
-      resize: vertical;
-      outline: none;
-      -webkit-user-select: text;
-      user-select: text;
-      box-sizing: border-box;
-    }
+    #transcript-box { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; min-height: 200px; font-size: 0.9rem; line-height: 1.7; color: var(--text); font-family: var(--font); resize: vertical; outline: none; -webkit-user-select: text; user-select: text; box-sizing: border-box; }
     #transcript-box:focus { border-color: var(--accent); }
     #transcript-box::placeholder { color: var(--muted); font-style: italic; }
 
@@ -294,12 +266,12 @@
 
     <label for="gemini-model-select">Modelo de Notas Inteligentes (Gemini)</label>
     <select id="gemini-model-select">
-      <option value="gemini-2.5-flash">✨ Gemini 2.5 Flash (Recomendado — estable, 1M tokens)</option>
-      <option value="gemini-2.5-flash-lite">⚡ Gemini 2.5 Flash-Lite (Más rápido y económico)</option>
-      <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro (Razonamiento avanzado)</option>
-      <option value="gemini-3.5-flash">💫 Gemini 3.5 Flash</option>
-      <option value="gemini-3.8-flash">🚀 Gemini 3.8 Flash (Última generación)</option>
-      <option value="gemini-flash-latest">🔄 Gemini Flash (auto-actualizable)</option>
+      <option value="gemini-3.8-flash">✨ Gemini 3.8 Flash (Recomendado — última generación)</option>
+      <option value="gemini-3.7-flash">⚡ Gemini 3.7 Flash</option>
+      <option value="gemini-3.6-flash">💫 Gemini 3.6 Flash</option>
+      <option value="gemini-3.5-flash">💡 Gemini 3.5 Flash</option>
+      <option value="gemini-3.5-flash-lite">🌱 Gemini 3.5 Flash-Lite (ligero)</option>
+      <option value="gemini-3.1-pro-preview">🧠 Gemini 3.1 Pro Preview (razonamiento)</option>
     </select>
 
     <div class="key-divider">
@@ -460,14 +432,16 @@
 
   <script>
     // ═══════════════════════════════════════════════════════════════
-    // 🔮 GEMINI — Configuración
+    // 🔮 GEMINI — Interactions API (v1beta)
     // ═══════════════════════════════════════════════════════════════
     const GEMINI_API_KEY_DEFAULT = 'PEGA_AQUI_TU_API_KEY_DE_GEMINI';
 
     const LS_KEY_GEMINI_API = 'meetingmind_gemini_api_key';
     const LS_KEY_GEMINI_MODEL = 'meetingmind_gemini_model';
 
-    const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+    // 🔥 NUEVO — Endpoint de la Interactions API
+    const GEMINI_INTERACTIONS_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
+    const GEMINI_API_REVISION = '2026-05-20';
 
     function isValidGeminiKey(k) {
       if (typeof k !== 'string') return false;
@@ -504,7 +478,7 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🎙️ GROQ — Solo para Whisper
+    // 🎙️ GROQ — Whisper (transcripción de audio)
     // ═══════════════════════════════════════════════════════════════
     const GROQ_KEYS_DEFAULT = [
       "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",
@@ -570,29 +544,25 @@
 
     const MODE_DEFINITIONS = {
       academico: {
-        categoria: 'academico',
-        categoriaLabel: 'Académico',
+        categoria: 'academico', categoriaLabel: 'Académico',
         contexto: ['Clase Teórica'],
         enfoque: ['Conceptos Clave', 'Extraer Fórmulas y Cálculos'],
         isLanguageFocus: false
       },
       idiomas: {
-        categoria: 'academico',
-        categoriaLabel: 'Idiomas',
+        categoria: 'academico', categoriaLabel: 'Idiomas',
         contexto: ['Clase de Idioma'],
         enfoque: ['Vocabulario Nuevo', 'Gramática'],
         isLanguageFocus: true
       },
       ejecutivo: {
-        categoria: 'ejecutivo',
-        categoriaLabel: 'Ejecutivo',
+        categoria: 'ejecutivo', categoriaLabel: 'Ejecutivo',
         contexto: ['Reunión de Avance'],
         enfoque: ['Acuerdos', 'Tareas Pendientes', 'Decisiones Clave'],
         isLanguageFocus: false
       },
       libre: {
-        categoria: 'libre',
-        categoriaLabel: 'Libre',
+        categoria: 'libre', categoriaLabel: 'Libre',
         contexto: ['Conversación Libre'],
         enfoque: ['Resumen General', 'Ideas Principales'],
         isLanguageFocus: false
@@ -679,27 +649,16 @@
     let modeSelectState = { mode: null, pendingAction: null };
     let wakeLock = null;
 
-    // ═══════════════════════════════════════════════════════════════
-    // 🔥 WAKE LOCK
-    // ═══════════════════════════════════════════════════════════════
     async function requestWakeLock() {
       const notice = document.getElementById('wake-lock-notice');
       try {
-        if (!('wakeLock' in navigator)) {
-          console.warn('[WakeLock] API no soportada');
-          return false;
-        }
+        if (!('wakeLock' in navigator)) return false;
         if (wakeLock) return true;
         wakeLock = await navigator.wakeLock.request('screen');
-        wakeLock.addEventListener('release', () => {
-          console.log('[WakeLock] Liberado por el sistema');
-          wakeLock = null;
-        });
-        console.log('[WakeLock] ✅ Activo');
+        wakeLock.addEventListener('release', () => { wakeLock = null; });
         if (notice) notice.classList.add('show');
         return true;
       } catch (err) {
-        console.warn('[WakeLock] ❌ Error:', err.message);
         wakeLock = null;
         return false;
       }
@@ -708,14 +667,8 @@
     async function releaseWakeLock() {
       const notice = document.getElementById('wake-lock-notice');
       try {
-        if (wakeLock) {
-          await wakeLock.release();
-          wakeLock = null;
-          console.log('[WakeLock] Liberado manualmente');
-        }
-      } catch (err) {
-        console.warn('[WakeLock] Error al liberar:', err.message);
-      }
+        if (wakeLock) { await wakeLock.release(); wakeLock = null; }
+      } catch (err) {}
       if (notice) notice.classList.remove('show');
     }
 
@@ -746,7 +699,7 @@
         ? GEMINI_API_KEY
         : '';
 
-      const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
+      const GEMINI_MODEL_DEFAULT = 'gemini-3.8-flash';
       const savedModel = memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL);
       const modelExists = savedModel && [...geminiModelSelect.options].some(o => o.value === savedModel);
       if (modelExists) {
@@ -773,9 +726,9 @@
         }
       });
 
-      // 🔥 Botón Probar — 7 modelos + pausas para sortear 503/429
+      // 🔥 Botón Probar — Interactions API
       document.getElementById('btn-test-gemini').addEventListener('click', async () => {
-        geminiKeyStatus.textContent = '🧪 Probando conexión con Gemini…';
+        geminiKeyStatus.textContent = '🧪 Probando conexión con Gemini (Interactions API)…';
         geminiKeyStatus.style.color = 'var(--muted)';
 
         const apiKeyClean = String(GEMINI_API_KEY || '').trim();
@@ -788,31 +741,31 @@
 
         const testModels = [
           geminiModelSelect.value,
-          'gemini-2.5-flash',
-          'gemini-3.5-flash',
           'gemini-3.8-flash',
-          'gemini-flash-latest',
-          'gemini-2.5-flash-lite',
-          'gemini-2.5-pro'
+          'gemini-3.7-flash',
+          'gemini-3.6-flash',
+          'gemini-3.5-flash',
+          'gemini-3.5-flash-lite',
+          'gemini-3.1-pro-preview'
         ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
         let lastErr = null;
 
         for (const rawModel of testModels) {
           const model = rawModel.trim().replace(/^models\//, '');
-          const url = `${GEMINI_API_BASE}/${model}:generateContent`;
 
           try {
             geminiKeyStatus.textContent = `🧪 Probando "${model}"…`;
-            const res = await fetchWithTimeout(url, {
+            const res = await fetchWithTimeout(GEMINI_INTERACTIONS_URL, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
-                'x-goog-api-key': apiKeyClean
+                'x-goog-api-key': apiKeyClean,
+                'Api-Revision': GEMINI_API_REVISION
               },
               body: JSON.stringify({
-                contents: [{ parts: [{ text: 'Responde exactamente con el texto: OK' }] }],
-                generationConfig: { temperature: 0, maxOutputTokens: 20 }
+                model: model,
+                input: 'Responde exactamente con el texto: OK'
               })
             }, 30000);
 
@@ -847,12 +800,10 @@
               continue;
             }
             if (res.status === 503 || res.status === 502 || res.status === 504) {
-              console.warn(`[Test] "${model}" saturado (${res.status}). Siguiente…`);
               await new Promise(r => setTimeout(r, 1200));
               continue;
             }
             if (res.status === 429) {
-              console.warn(`[Test] "${model}" rate limit. Siguiente…`);
               await new Promise(r => setTimeout(r, 2000));
               continue;
             }
@@ -922,11 +873,8 @@
       });
 
       btnStartRecord.addEventListener('click', () => {
-        if (isRecordingActive) {
-          stopRecordingProcess();
-        } else {
-          openModeSelectModal('record');
-        }
+        if (isRecordingActive) stopRecordingProcess();
+        else openModeSelectModal('record');
       });
 
       btnUpload.addEventListener('click', () => {
@@ -1077,9 +1025,6 @@
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 🎯 MODAL DE SELECCIÓN DE MODO
-    // ═══════════════════════════════════════════════════════════════
     function initModeSelectModalListeners() {
       const modal = document.getElementById('mode-select-modal');
       const chips = document.querySelectorAll('#mode-select-chips .prompt-cat-chip');
@@ -1119,13 +1064,9 @@
         modal.classList.remove('open');
         modeSelectState = { mode: null, pendingAction: null };
 
-        if (action === 'record') {
-          startRecordingProcess();
-        } else if (action === 'upload') {
-          document.getElementById('file-input').click();
-        } else if (action === 'analyze-pasted') {
-          triggerAutoAnalysis();
-        }
+        if (action === 'record') startRecordingProcess();
+        else if (action === 'upload') document.getElementById('file-input').click();
+        else if (action === 'analyze-pasted') triggerAutoAnalysis();
       });
     }
 
@@ -1142,7 +1083,6 @@
     // ═══════════════════════════════════════════════════════════════
     async function startRecordingProcess() {
       if (isRecordingActive) return;
-
       await requestWakeLock();
 
       if (window.AndroidNative && typeof window.AndroidNative.startRecording === 'function') {
@@ -1208,7 +1148,6 @@
     function stopRecordingProcess() {
       if (!isRecordingActive) return;
       isRecordingActive = false;
-
       releaseWakeLock();
 
       if (window.AndroidNative && typeof window.AndroidNative.stopRecording === 'function') {
@@ -1237,19 +1176,15 @@
         if (!base64Audio || typeof base64Audio !== 'string' || base64Audio.length < 10) {
           throw new Error('Audio nativo vacío o inválido.');
         }
-
         const cleanB64 = base64Audio.includes(',') ? base64Audio.split(',').pop() : base64Audio;
         const binary = atob(cleanB64);
         const len = binary.length;
         const bytes = new Uint8Array(len);
         for (let i = 0; i < len; i++) bytes[i] = binary.charCodeAt(i);
-
         const blob = new Blob([bytes], { type: 'audio/mp4' });
         const file = new File([blob], `record_native_${Date.now()}.m4a`, { type: 'audio/mp4' });
-
         resetRecordButton();
         setStatus('loading', 'Transcribiendo grabación nativa…');
-
         await transcribeRecordedChunk(file);
       } catch (err) {
         console.error('[receiveNativeAudio]', err);
@@ -1269,10 +1204,8 @@
             notice.className = 'transcript-error';
             notice.innerHTML = `
               <span class="err-title">⚠️ No se pudo transcribir por error de red</span>
-              <strong>Tu grabación NO se perdió.</strong> Está guardada permanentemente en:
+              <strong>Tu grabación NO se perdió.</strong> Está guardada en:
               <div class="err-detail">📁 Música › MeetingMind › MeetingMind_*.m4a</div>
-              Cuando recuperes la conexión, toca <strong>📂 Subir Audios</strong> y selecciona
-              el archivo desde esa carpeta para transcribirlo.
             `;
             area.appendChild(notice);
           }
@@ -1313,16 +1246,13 @@
       area.innerHTML = html;
     }
 
-    function clearTranscriptProgress() {
-      setTranscriptProgressHTML('');
-    }
+    function clearTranscriptProgress() { setTranscriptProgressHTML(''); }
 
     async function transcribeRecordedChunk(file) {
       const id = 'temp_' + Date.now();
       setTranscriptProgressHTML(
         `<div class="transcript-progress" id="${id}"><span class="spinner"></span><span class="progress-text">Transcribiendo bloque de audio...</span></div>`
       );
-
       try {
         const transcript = await transcribeWithGroqChunked(file, (msg) => {
           const el = document.getElementById(id);
@@ -1330,14 +1260,9 @@
           if (t) t.textContent = msg;
           setStatus('loading', msg);
         });
-
-        if (transcript && transcript.trim()) {
-          appendToTranscript(transcript.trim());
-        }
+        if (transcript && transcript.trim()) appendToTranscript(transcript.trim());
         clearTranscriptProgress();
-
         await maybeAutoAnalyze();
-
       } catch (err) {
         const errDiv = document.createElement('div');
         errDiv.className = 'transcript-error';
@@ -1369,7 +1294,6 @@
 
       for (let i = 0; i < files.length; i++) {
         if (signal.aborted) break;
-
         const file = files[i];
         const fileMB = (file.size / (1024 * 1024)).toFixed(2);
         setStatus('loading', `Procesando audio ${i + 1}/${files.length} (${fileMB} MB)...`);
@@ -1397,24 +1321,20 @@
             if (textEl) { textEl.textContent = msg; textEl.dataset.base = msg; }
             setStatus('loading', `${msg} (Audio ${i + 1}/${files.length})`);
           });
-
           if (transcript && transcript.trim()) {
             appendToTranscript(transcript.trim());
             showToast(`✅ Audio ${i + 1} completado.`);
           } else {
             const emptyEl = document.createElement('div');
             emptyEl.className = 'transcript-error';
-            emptyEl.innerHTML = `<span class="err-title">⚠️ Audio ${i + 1} sin texto detectable</span>El archivo puede estar silencioso, corrupto o en un formato no soportado.`;
+            emptyEl.innerHTML = `<span class="err-title">⚠️ Audio ${i + 1} sin texto detectable</span>El archivo puede estar silencioso o corrupto.`;
             progressArea.appendChild(emptyEl);
           }
         } catch (err) {
           const errDiv = document.createElement('div');
           errDiv.className = 'transcript-error';
           const isCancel = err.message.includes('Cancelado');
-          errDiv.innerHTML = `
-            <span class="err-title">${isCancel ? '⏹️ Cancelado' : '❌ Error al procesar "' + escHtml(file.name) + '"'}</span>
-            ${escHtml(err.message)}
-          `;
+          errDiv.innerHTML = `<span class="err-title">${isCancel ? '⏹️ Cancelado' : '❌ Error al procesar "' + escHtml(file.name) + '"'}</span>${escHtml(err.message)}`;
           progressArea.appendChild(errDiv);
           if (isCancel) { showToast('⏹️ Transcripción cancelada.'); break; }
           else showToast(`❌ Fallo: ${err.message.slice(0, 80)}`);
@@ -1428,11 +1348,8 @@
       globalTranscriptionController = null;
 
       const hasContent = document.getElementById('transcript-box').value.trim().length > 0;
-      if (hasContent && !signal.aborted) {
-        await maybeAutoAnalyze();
-      } else {
-        setStatus('error', 'No se pudo extraer texto del audio.');
-      }
+      if (hasContent && !signal.aborted) await maybeAutoAnalyze();
+      else setStatus('error', 'No se pudo extraer texto del audio.');
       enableAllButtons();
     }
 
@@ -1475,14 +1392,11 @@
 
     async function transcribeSingleChunk(file) {
       let lastError = null;
-
       for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
         if (globalTranscriptionController && globalTranscriptionController.signal.aborted) {
           throw new Error('Cancelado por el usuario.');
         }
-
         const apiKey = getNextGroqKey();
-
         const formData = new FormData();
         formData.append('file', file);
         formData.append('model', 'whisper-large-v3-turbo');
@@ -1501,10 +1415,8 @@
             const data = await response.json();
             return data.text || '';
           }
-
           const errData = await response.json().catch(() => ({}));
           const errMsg = errData?.error?.message || `HTTP ${response.status}`;
-
           if (response.status === 401 || response.status === 403) {
             lastError = new Error(`API Key inválida o revocada (${response.status}).`);
             continue;
@@ -1547,7 +1459,6 @@
         setStatus('idle', 'Transcripción lista. Pulsa "Analizar Texto Pegado" para generar notas.');
         return;
       }
-
       const opts = getSessionOptions();
       await analyzeText(text, document.getElementById('notes-container'), opts);
       document.querySelector('[data-tab="notas"]')?.click();
@@ -1586,23 +1497,7 @@
     function extractGeminiText(data) {
       if (!data || typeof data !== 'object') return '';
 
-      const candidates = data.candidates;
-      if (Array.isArray(candidates) && candidates.length > 0) {
-        const parts = candidates[0]?.content?.parts;
-        if (Array.isArray(parts)) {
-          let text = '';
-          for (const p of parts) {
-            if (p?.thought === true) continue;
-            if (typeof p?.text === 'string') text += p.text;
-          }
-          if (text.trim()) return text;
-        }
-        const reason = candidates[0]?.finishReason;
-        if (reason && reason !== 'STOP') {
-          console.warn('[Gemini] finishReason:', reason);
-        }
-      }
-
+      // 🔥 Interactions API: steps[].content[].text
       if (Array.isArray(data.steps)) {
         let text = '';
         for (const step of data.steps) {
@@ -1617,15 +1512,30 @@
         if (text.trim()) return text;
       }
 
+      // Convenience property (SDK)
       if (typeof data.output_text === 'string' && data.output_text.trim()) {
         return data.output_text;
+      }
+
+      // Fallback: legacy candidates[0].content.parts[0].text
+      const candidates = data.candidates;
+      if (Array.isArray(candidates) && candidates.length > 0) {
+        const parts = candidates[0]?.content?.parts;
+        if (Array.isArray(parts)) {
+          let text = '';
+          for (const p of parts) {
+            if (p?.thought === true) continue;
+            if (typeof p?.text === 'string') text += p.text;
+          }
+          if (text.trim()) return text;
+        }
       }
 
       return '';
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🤖 GEMINI — Llamada con fallback ampliado de 10 modelos
+    // 🤖 GEMINI — Interactions API con fallback de modelos 3.x
     // ═══════════════════════════════════════════════════════════════
     async function callGemini(systemPrompt, userContent, timeoutMs, options = {}) {
       const apiKey = String(GEMINI_API_KEY || '').trim();
@@ -1634,51 +1544,48 @@
         throw new Error('Gemini API Key no configurada o inválida. Ve a ⚙️ Configuración → 🔮 Gemini API Key.');
       }
 
-      const userModel = (memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-2.5-flash')
+      const userModel = (memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-3.8-flash')
         .trim()
         .replace(/^models\//, '');
 
-      // 🔥 Lista ampliada: mezcla versiones para sortear picos de demanda
+      // 🔥 Solo modelos Gemini 3.x disponibles en Interactions API
       const modelsToTry = [
         userModel,
-        'gemini-2.5-flash',
-        'gemini-3.5-flash',
         'gemini-3.8-flash',
-        'gemini-flash-latest',
-        'gemini-2.5-flash-lite',
-        'gemini-2.5-pro',
-        'gemini-flash-lite-latest',
-        'gemini-3-flash-preview',
-        'gemma-4-31b-it'
+        'gemini-3.7-flash',
+        'gemini-3.6-flash',
+        'gemini-3.5-flash',
+        'gemini-3.5-flash-lite',
+        'gemini-3.1-pro-preview',
+        'gemini-3-flash-preview'
       ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
       let lastError = null;
       let lastStatus = 0;
 
       for (const currentModel of modelsToTry) {
-        const url = `${GEMINI_API_BASE}/${currentModel}:generateContent`;
-
         const payload = {
-          contents: [{
-            parts: [{ text: systemPrompt + '\n\n' + userContent }]
-          }],
-          generationConfig: {
-            temperature: 0.2,
-            maxOutputTokens: 8192
-          }
+          model: currentModel,
+          input: systemPrompt + '\n\n' + userContent
         };
 
         if (options.responseFormat === 'json') {
-          payload.generationConfig.responseMimeType = 'application/json';
+          payload.response_format = [
+            {
+              type: 'text',
+              mime_type: 'application/json'
+            }
+          ];
         }
 
         let response;
         try {
-          response = await fetchWithTimeout(url, {
+          response = await fetchWithTimeout(GEMINI_INTERACTIONS_URL, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey
+              'x-goog-api-key': apiKey,
+              'Api-Revision': GEMINI_API_REVISION
             },
             body: JSON.stringify(payload)
           }, timeoutMs || 120000);
@@ -1692,12 +1599,12 @@
           const data = await response.json();
           const text = extractGeminiText(data);
           if (text && text.trim()) {
-            console.log(`[Gemini] ✅ Éxito con "${currentModel}"`);
+            console.log(`[Gemini] ✅ Éxito con "${currentModel}" (Interactions API)`);
             return text;
           }
-          const reason = data?.candidates?.[0]?.finishReason;
-          if (reason && reason !== 'STOP') {
-            throw new Error(`Gemini bloqueó la respuesta (${reason}). Intenta reformular el texto.`);
+          if (data?.status === 'failed' || data?.errors) {
+            const errDetail = data.errors ? JSON.stringify(data.errors) : data.status;
+            throw new Error(`Gemini falló: ${errDetail}`);
           }
           throw new Error('Respuesta vacía de Gemini.');
         }
@@ -1711,15 +1618,17 @@
         lastStatus = response.status;
         const low = errMsg.toLowerCase();
 
+        // Modelo no existe → siguiente
         if (response.status === 404 || (low.includes('not found') && low.includes('model'))) {
           console.warn(`[Gemini] "${currentModel}" no existe. Siguiente…`);
           lastError = new Error(`Modelo "${currentModel}" no disponible.`);
           continue;
         }
 
-        if (response.status === 400 && (low.includes('not supported') || low.includes('not supported for'))) {
-          console.warn(`[Gemini] "${currentModel}" no soporta generateContent. Siguiente…`);
-          lastError = new Error(`Modelo "${currentModel}" no soporta esta operación.`);
+        // Modelo no soportado → siguiente
+        if (response.status === 400 && (low.includes('not supported') || low.includes('no longer available'))) {
+          console.warn(`[Gemini] "${currentModel}" no soportado. Siguiente…`);
+          lastError = new Error(`Modelo "${currentModel}" no soportado.`);
           continue;
         }
 
@@ -1727,22 +1636,24 @@
           if (low.includes('api key') || low.includes('api_key') || low.includes('invalid key')) {
             throw new Error('Gemini API Key inválida. Revisa que sea correcta y sin espacios.');
           }
+          if (low.includes('revision')) {
+            throw new Error('Versión de API no soportada. Actualiza la app.');
+          }
           throw new Error(`Solicitud inválida a Gemini: ${errMsg}`);
         }
         if (response.status === 401 || response.status === 403) {
           throw new Error('Gemini API Key sin permisos o revocada.');
         }
         if (response.status === 429) {
-          console.warn(`[Gemini] "${currentModel}" rate limit. Esperando y siguiente…`);
+          console.warn(`[Gemini] "${currentModel}" rate limit. Esperando…`);
           lastError = new Error(`Rate limit alcanzado.`);
           await delay(2000);
           continue;
         }
         if (response.status >= 500) {
-          // 🔥 503 = servidor saturado → pausa breve antes del siguiente modelo
           const waitMs = response.status === 503 ? 1200 : 800;
-          console.warn(`[Gemini] "${currentModel}" devolvió ${response.status}. Esperando ${waitMs}ms y probando siguiente…`);
-          lastError = new Error(`Modelo saturado (${response.status}).`);
+          console.warn(`[Gemini] "${currentModel}" devolvió ${response.status}. Esperando ${waitMs}ms…`);
+          lastError = new Error(`Servidor saturado (${response.status}).`);
           await delay(waitMs);
           continue;
         }
@@ -1754,7 +1665,7 @@
         throw new Error(`No se pudo conectar con Gemini. Verifica tu conexión a internet.`);
       }
       if (lastStatus === 503 || lastStatus === 502 || lastStatus === 504) {
-        throw new Error('Los servidores de Gemini están saturados ahora mismo (503). Espera 1-2 minutos y vuelve a intentarlo.');
+        throw new Error('Los servidores de Gemini están saturados (503). Espera 1-2 minutos y reintenta.');
       }
       if (lastStatus === 429) {
         throw new Error('Límite temporal de Gemini alcanzado. Espera un minuto.');
@@ -1782,7 +1693,6 @@ REGLAS UNIVERSALES
 
 3) SIN INVENTAR TEMAS AJENOS:
    • PROHIBIDO introducir conceptos, autores o teorías que NO fueron mencionados.
-   • Si algo es inaudible o ambiguo, escribe "[inaudible]".
 
 4) FORMATO DE SALIDA — JSON ESTRICTO OBLIGATORIO:
 
@@ -1813,11 +1723,6 @@ MODO: ACADÉMICO con ENFOQUE EN CLASE DE IDIOMAS
 
 ROL: TUTOR Y PROFESOR DE IDIOMAS EXPERTO.
 
-REGLAS ESPECIALES:
-A) Corrige palabras mal escritas por Whisper (ej: "gouing tu de jardin" → "going to the garden").
-B) Registra errores del alumno: "Dijiste: X → Correcto: Y (explicación).".
-C) Fidelidad al idioma que se enseña. Mezcla: "Español: X / English: Y".
-
 ESTRUCTURA OBLIGATORIA — EXACTAMENTE estas 5 secciones:
    1. "Explicación Didáctica del Profesor" → "parrafos"
    2. "Vocabulario y Expresiones Clave" → "lista"
@@ -1830,56 +1735,14 @@ Genera el JSON con esas 5 secciones exactas.`;
 
       const REGLAS_MODO = {
         academico: `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 MODO: ACADÉMICO — Apuntes de Clase / Estudio
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-ESTRUCTURA SUGERIDA:
-  1. "📌 Tema Central" ............... parrafos
-  2. "🧠 Conceptos y Definiciones" ... lista
-  3. "🧮 Fórmulas y Datos Clave" ..... bloque
-  4. "📝 Desarrollo Explicativo" ..... parrafos
-  5. "⚠️ Correcciones al Audio" ..... lista
-  6. "✅ Tareas y Asignaciones" ...... lista
-
-REGLAS:
-  • Antepón la versión correcta: "F = m·a (audio: F = m/a)".
-  • Respeta orden de operaciones, unidades del SI y símbolos.`,
-
+ESTRUCTURA: Tema Central, Conceptos, Fórmulas, Desarrollo, Correcciones, Tareas.`,
         ejecutivo: `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MODO: EJECUTIVO — Reunión de Negocio / Trabajo
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-ESTRUCTURA SUGERIDA:
-  1. "📝 Resumen Ejecutivo" .......... parrafos
-  2. "💡 Puntos Clave" ............... lista
-  3. "🎯 Decisiones y Acuerdos" ...... lista
-  4. "✅ Elementos de Acción" ........ lista (formato: "Tarea — Responsable — Fecha")
-  5. "📊 Métricas y Cifras" .......... bloque
-  6. "⚠️ Aclaraciones y Correcciones" lista
-
-REGLAS:
-  • Corrige siglas mal dichas: "KPI", "ROI".
-  • Unifica cifras: "treinta por ciento" → "30%".
-  • Si no hay responsable/fecha: "por asignar" / "sin definir".`,
-
+MODO: EJECUTIVO — Reunión de Negocio
+ESTRUCTURA: Resumen Ejecutivo, Puntos Clave, Decisiones, Acciones, Métricas, Aclaraciones.`,
         libre: `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MODO: LIBRE — Reflexión / Podcast / Conversación
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-ESTRUCTURA SUGERIDA:
-  1. "📝 Resumen General" ............ parrafos
-  2. "💡 Ideas Principales" .......... lista
-  3. "💭 Citas Destacadas" ........... bloque
-  4. "📌 Notas y Matices" ............ lista
-  5. "🌱 Reflexiones Sugeridas" ...... lista
-
-REGLAS:
-  • RESPETA la voz del autor. No conviertas charla informal en ensayo.
-  • Corrige SOLO errores factuales objetivos.
-  • Citas TEXTUALES entre comillas.`
+MODO: LIBRE — Reflexión / Podcast
+ESTRUCTURA: Resumen General, Ideas Principales, Citas, Notas, Reflexiones.`
       };
 
       const reglasEspecificas = REGLAS_MODO[mode] || REGLAS_MODO.academico;
@@ -2110,16 +1973,16 @@ REGLAS:
 
       try {
         const userMessage = `${options.isLanguageFocus
-          ? 'Enfoque adicional: CLASE DE IDIOMAS. Aplica las 5 secciones obligatorias de idiomas.\n\n'
-          : ''}Contexto del audio: ${options.contexto.join(', ')}
-Enfoque principal: ${options.enfoque.join(', ')}
+          ? 'Enfoque adicional: CLASE DE IDIOMAS.\n\n'
+          : ''}Contexto: ${options.contexto.join(', ')}
+Enfoque: ${options.enfoque.join(', ')}
 
 TRANSCRIPCIÓN COMPLETA:
 """
 ${text}
 """
 
-Genera las notas AHORA en JSON estricto según el esquema indicado.`;
+Genera las notas AHORA en JSON estricto.`;
 
         const rawResponse = await callGemini(systemPrompt, userMessage, 180000, { responseFormat: 'json' });
 
@@ -2130,7 +1993,6 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
           markdownNotes = jsonNotesToMarkdown(jsonNotes);
           docTitle = jsonNotes.titulo_principal || 'Apuntes de la sesión';
         } else {
-          console.warn('[analyze] Gemini no devolvió JSON válido. Usando fallback markdown.');
           markdownNotes = rawResponse.trim()
             .replace(/^```(?:markdown|md)?\s*\n?/i, '')
             .replace(/\n?```\s*$/i, '')
