@@ -109,10 +109,7 @@
     .tab-pane { display: none; padding: 16px; min-height: 180px; }
     .tab-pane.active { display: block; animation: fadeSlide 0.2s ease; }
 
-    #transcript-progress-area {
-      min-height: 0;
-      margin-bottom: 10px;
-    }
+    #transcript-progress-area { min-height: 0; margin-bottom: 10px; }
     #transcript-progress-area:empty { display: none; }
 
     #transcript-box {
@@ -300,8 +297,8 @@
       <option value="gemini-2.5-flash">✨ Gemini 2.5 Flash (Recomendado — estable, 1M tokens)</option>
       <option value="gemini-2.5-flash-lite">⚡ Gemini 2.5 Flash-Lite (Más rápido y económico)</option>
       <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro (Razonamiento avanzado)</option>
-      <option value="gemini-3.8-flash">🚀 Gemini 3.8 Flash (Última generación)</option>
       <option value="gemini-3.5-flash">💫 Gemini 3.5 Flash</option>
+      <option value="gemini-3.8-flash">🚀 Gemini 3.8 Flash (Última generación)</option>
       <option value="gemini-flash-latest">🔄 Gemini Flash (auto-actualizable)</option>
     </select>
 
@@ -470,7 +467,6 @@
     const LS_KEY_GEMINI_API = 'meetingmind_gemini_api_key';
     const LS_KEY_GEMINI_MODEL = 'meetingmind_gemini_model';
 
-    // Endpoint clásico y estable (funciona con generateContent)
     const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
     function isValidGeminiKey(k) {
@@ -572,9 +568,6 @@
     const LS_KEY_PROJECTS = 'meetingmind_projects';
     const LS_KEY_CHECKBOX = 'meetingmind_notion_checkboxes';
 
-    // ═══════════════════════════════════════════════════════════════
-    // 📋 MODOS DE SESIÓN
-    // ═══════════════════════════════════════════════════════════════
     const MODE_DEFINITIONS = {
       academico: {
         categoria: 'academico',
@@ -683,11 +676,7 @@
     let isRecordingActive = false;
     let recordingChunkInterval = null;
 
-    let modeSelectState = {
-      mode: null,
-      pendingAction: null
-    };
-
+    let modeSelectState = { mode: null, pendingAction: null };
     let wakeLock = null;
 
     // ═══════════════════════════════════════════════════════════════
@@ -784,7 +773,7 @@
         }
       });
 
-      // 🔥 Botón Probar — modelos reales
+      // 🔥 Botón Probar — 7 modelos + pausas para sortear 503/429
       document.getElementById('btn-test-gemini').addEventListener('click', async () => {
         geminiKeyStatus.textContent = '🧪 Probando conexión con Gemini…';
         geminiKeyStatus.style.color = 'var(--muted)';
@@ -800,8 +789,11 @@
         const testModels = [
           geminiModelSelect.value,
           'gemini-2.5-flash',
+          'gemini-3.5-flash',
+          'gemini-3.8-flash',
+          'gemini-flash-latest',
           'gemini-2.5-flash-lite',
-          'gemini-flash-latest'
+          'gemini-2.5-pro'
         ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
         let lastErr = null;
@@ -852,6 +844,16 @@
 
             if (res.status === 404 || errMsg.toLowerCase().includes('not found')) {
               console.warn(`[Test] "${model}" no existe, siguiente…`);
+              continue;
+            }
+            if (res.status === 503 || res.status === 502 || res.status === 504) {
+              console.warn(`[Test] "${model}" saturado (${res.status}). Siguiente…`);
+              await new Promise(r => setTimeout(r, 1200));
+              continue;
+            }
+            if (res.status === 429) {
+              console.warn(`[Test] "${model}" rate limit. Siguiente…`);
+              await new Promise(r => setTimeout(r, 2000));
               continue;
             }
             if (res.status === 400 && (errMsg.toLowerCase().includes('api key') || errMsg.toLowerCase().includes('api_key'))) {
@@ -1590,7 +1592,6 @@
         if (Array.isArray(parts)) {
           let text = '';
           for (const p of parts) {
-            // Filtramos thoughts (razonamiento interno)
             if (p?.thought === true) continue;
             if (typeof p?.text === 'string') text += p.text;
           }
@@ -1624,7 +1625,7 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🤖 GEMINI — Llamada con fallback de modelos reales
+    // 🤖 GEMINI — Llamada con fallback ampliado de 10 modelos
     // ═══════════════════════════════════════════════════════════════
     async function callGemini(systemPrompt, userContent, timeoutMs, options = {}) {
       const apiKey = String(GEMINI_API_KEY || '').trim();
@@ -1637,13 +1638,18 @@
         .trim()
         .replace(/^models\//, '');
 
+      // 🔥 Lista ampliada: mezcla versiones para sortear picos de demanda
       const modelsToTry = [
         userModel,
         'gemini-2.5-flash',
-        'gemini-2.5-flash-lite',
+        'gemini-3.5-flash',
+        'gemini-3.8-flash',
         'gemini-flash-latest',
+        'gemini-2.5-flash-lite',
         'gemini-2.5-pro',
-        'gemini-3.8-flash'
+        'gemini-flash-lite-latest',
+        'gemini-3-flash-preview',
+        'gemma-4-31b-it'
       ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
       let lastError = null;
@@ -1727,10 +1733,17 @@
           throw new Error('Gemini API Key sin permisos o revocada.');
         }
         if (response.status === 429) {
-          throw new Error('Límite de Gemini alcanzado. Espera un minuto e inténtalo de nuevo.');
+          console.warn(`[Gemini] "${currentModel}" rate limit. Esperando y siguiente…`);
+          lastError = new Error(`Rate limit alcanzado.`);
+          await delay(2000);
+          continue;
         }
         if (response.status >= 500) {
-          lastError = new Error(`Error del servidor (${response.status}).`);
+          // 🔥 503 = servidor saturado → pausa breve antes del siguiente modelo
+          const waitMs = response.status === 503 ? 1200 : 800;
+          console.warn(`[Gemini] "${currentModel}" devolvió ${response.status}. Esperando ${waitMs}ms y probando siguiente…`);
+          lastError = new Error(`Modelo saturado (${response.status}).`);
+          await delay(waitMs);
           continue;
         }
 
@@ -1738,7 +1751,13 @@
       }
 
       if (lastStatus === 0) {
-        throw new Error(`No se pudo conectar con Gemini. Verifica tu conexión. (${lastError?.message || 'Desconocido'})`);
+        throw new Error(`No se pudo conectar con Gemini. Verifica tu conexión a internet.`);
+      }
+      if (lastStatus === 503 || lastStatus === 502 || lastStatus === 504) {
+        throw new Error('Los servidores de Gemini están saturados ahora mismo (503). Espera 1-2 minutos y vuelve a intentarlo.');
+      }
+      if (lastStatus === 429) {
+        throw new Error('Límite temporal de Gemini alcanzado. Espera un minuto.');
       }
       throw new Error(`Todos los modelos fallaron. Último: ${lastError?.message || `HTTP ${lastStatus}`}`);
     }
