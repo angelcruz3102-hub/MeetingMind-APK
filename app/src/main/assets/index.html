@@ -86,7 +86,6 @@
     #status-dot.error .dot { background: var(--error); box-shadow: 0 0 8px var(--error); }
     @keyframes blink { 50% { opacity: 0; } }
 
-    /* 🔥 NUEVO — Aviso de Wake Lock */
     #wake-lock-notice {
       display: none;
       align-items: center;
@@ -110,14 +109,12 @@
     .tab-pane { display: none; padding: 16px; min-height: 180px; }
     .tab-pane.active { display: block; animation: fadeSlide 0.2s ease; }
 
-    /* 🔥 NUEVO — Progress messages en un área separada */
     #transcript-progress-area {
       min-height: 0;
       margin-bottom: 10px;
     }
     #transcript-progress-area:empty { display: none; }
 
-    /* 🔥 NUEVO — Textarea editable de transcripción */
     #transcript-box {
       width: 100%;
       background: var(--bg);
@@ -300,9 +297,12 @@
 
     <label for="gemini-model-select">Modelo de Notas Inteligentes (Gemini)</label>
     <select id="gemini-model-select">
-      <option value="gemini-3.8-flash">✨ 3.8 Flash (Recomendado — rápido)</option>
-      <option value="gemini-3.8-pro">🧠 3.8 Pro (Razonamiento avanzado)</option>
-      <option value="gemini-2.0-flash-exp">🚀 2.0 Flash (Experimental)</option>
+      <option value="gemini-2.5-flash">✨ Gemini 2.5 Flash (Recomendado — estable, 1M tokens)</option>
+      <option value="gemini-2.5-flash-lite">⚡ Gemini 2.5 Flash-Lite (Más rápido y económico)</option>
+      <option value="gemini-2.5-pro">🧠 Gemini 2.5 Pro (Razonamiento avanzado)</option>
+      <option value="gemini-3.8-flash">🚀 Gemini 3.8 Flash (Última generación)</option>
+      <option value="gemini-3.5-flash">💫 Gemini 3.5 Flash</option>
+      <option value="gemini-flash-latest">🔄 Gemini Flash (auto-actualizable)</option>
     </select>
 
     <div class="key-divider">
@@ -394,15 +394,12 @@
         <button id="btn-copy-transcript" class="btn-copy-notion">📋 Copiar</button>
       </div>
 
-      <!-- 🔥 Progress messages (fuera de la caja editable) -->
       <div id="transcript-progress-area"></div>
 
-      <!-- 🔥 Textarea editable -->
       <textarea id="transcript-box"
                 placeholder="La transcripción aparecerá aquí... También puedes PEGAR tu propia transcripción y pulsar 'Analizar Texto Pegado'."
                 spellcheck="false"></textarea>
 
-      <!-- 🔥 Botón para analizar texto pegado -->
       <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
         <button id="btn-analyze-pasted" class="btn btn-primary" style="flex:1; min-width:180px;">
           ✨ Analizar Texto Pegado
@@ -429,7 +426,6 @@
 
   <div id="toast"></div>
 
-  <!-- 🔥 NUEVO — Modal de selección de enfoque antes de grabar/subir -->
   <div class="modal-overlay" id="mode-select-modal">
     <div class="modal-box" style="max-width: 480px;">
       <h3>🎯 ¿Qué enfoque de notas deseas?</h3>
@@ -467,16 +463,15 @@
 
   <script>
     // ═══════════════════════════════════════════════════════════════
-    // 🔮 GEMINI — Configuración (Interactions API v1beta)
+    // 🔮 GEMINI — Configuración
     // ═══════════════════════════════════════════════════════════════
-    // ⚠️ REEMPLAZA EL VALOR DE ABAJO POR TU API KEY REAL DE GEMINI
     const GEMINI_API_KEY_DEFAULT = 'PEGA_AQUI_TU_API_KEY_DE_GEMINI';
 
     const LS_KEY_GEMINI_API = 'meetingmind_gemini_api_key';
     const LS_KEY_GEMINI_MODEL = 'meetingmind_gemini_model';
 
-    const GEMINI_INTERACTIONS_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
-    const GEMINI_API_REVISION = '2026-05-20';
+    // Endpoint clásico y estable (funciona con generateContent)
+    const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
     function isValidGeminiKey(k) {
       if (typeof k !== 'string') return false;
@@ -578,7 +573,7 @@
     const LS_KEY_CHECKBOX = 'meetingmind_notion_checkboxes';
 
     // ═══════════════════════════════════════════════════════════════
-    // 📋 DEFINICIONES DE MODOS (para el modal y para el análisis)
+    // 📋 MODOS DE SESIÓN
     // ═══════════════════════════════════════════════════════════════
     const MODE_DEFINITIONS = {
       academico: {
@@ -678,30 +673,25 @@
       obtener(c) { try { return localStorage.getItem(c); } catch (e) { return this.datos[c] || null; } }
     };
 
-    // ═══════════════════════════════════════════════════════════════
-    // 📝 ESTADO GLOBAL
-    // ═══════════════════════════════════════════════════════════════
     let currentNotionMarkdown = '';
     let currentNoteKey = '';
     let currentOpenProjectId = null;
-    let currentSessionMode = null;   // 🔥 modo activo para esta sesión
+    let currentSessionMode = null;
 
     let micStream = null;
     let currentRecorder = null;
     let isRecordingActive = false;
     let recordingChunkInterval = null;
-    let isTranscribing = false;      // 🔥 evita auto-análisis durante cancelaciones
 
     let modeSelectState = {
       mode: null,
-      pendingAction: null   // 'record' | 'upload'
+      pendingAction: null
     };
 
-    // 🔥 Wake Lock
     let wakeLock = null;
 
     // ═══════════════════════════════════════════════════════════════
-    // 🔥 WAKE LOCK API — Evita que la pantalla se apague
+    // 🔥 WAKE LOCK
     // ═══════════════════════════════════════════════════════════════
     async function requestWakeLock() {
       const notice = document.getElementById('wake-lock-notice');
@@ -761,14 +751,13 @@
       const tabs = document.querySelectorAll('.tab');
       const tabPanes = document.querySelectorAll('.tab-pane');
 
-      // ── Gemini UI ──
       const geminiKeyInput = document.getElementById('gemini-key-input');
       const geminiKeyStatus = document.getElementById('gemini-key-status');
       geminiKeyInput.value = (GEMINI_API_KEY && GEMINI_API_KEY !== GEMINI_API_KEY_DEFAULT && isValidGeminiKey(GEMINI_API_KEY))
         ? GEMINI_API_KEY
         : '';
 
-      const GEMINI_MODEL_DEFAULT = 'gemini-3.8-flash';
+      const GEMINI_MODEL_DEFAULT = 'gemini-2.5-flash';
       const savedModel = memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL);
       const modelExists = savedModel && [...geminiModelSelect.options].some(o => o.value === savedModel);
       if (modelExists) {
@@ -795,52 +784,96 @@
         }
       });
 
+      // 🔥 Botón Probar — modelos reales
       document.getElementById('btn-test-gemini').addEventListener('click', async () => {
         geminiKeyStatus.textContent = '🧪 Probando conexión con Gemini…';
         geminiKeyStatus.style.color = 'var(--muted)';
-        const model = geminiModelSelect.value;
 
-        try {
-          const apiKeyClean = String(GEMINI_API_KEY || '').trim();
-          const modelClean = String(model || 'gemini-3.8-flash').trim().replace(/^models\//, '');
+        const apiKeyClean = String(GEMINI_API_KEY || '').trim();
 
-          const res = await fetchWithTimeout(GEMINI_INTERACTIONS_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': apiKeyClean,
-              'Api-Revision': GEMINI_API_REVISION
-            },
-            body: JSON.stringify({
-              model: modelClean,
-              input: 'Responde exactamente con el texto: OK'
-            })
-          }, 30000);
+        if (!isValidGeminiKey(apiKeyClean)) {
+          geminiKeyStatus.textContent = '❌ Gemini API Key no configurada. Pégala arriba y pulsa Guardar.';
+          geminiKeyStatus.style.color = 'var(--error)';
+          return;
+        }
 
-          if (res.ok) {
-            const data = await res.json();
-            const txt = extractGeminiText(data);
-            if (txt && txt.trim()) {
-              geminiKeyStatus.textContent = `✅ Gemini responde correctamente con "${modelClean}".`;
-              geminiKeyStatus.style.color = 'var(--success)';
-              showToast('✅ Gemini OK');
-            } else {
-              geminiKeyStatus.textContent = '⚠️ Respuesta vacía de Gemini.';
-              geminiKeyStatus.style.color = 'var(--error)';
+        const testModels = [
+          geminiModelSelect.value,
+          'gemini-2.5-flash',
+          'gemini-2.5-flash-lite',
+          'gemini-flash-latest'
+        ].filter((m, i, arr) => m && arr.indexOf(m) === i);
+
+        let lastErr = null;
+
+        for (const rawModel of testModels) {
+          const model = rawModel.trim().replace(/^models\//, '');
+          const url = `${GEMINI_API_BASE}/${model}:generateContent`;
+
+          try {
+            geminiKeyStatus.textContent = `🧪 Probando "${model}"…`;
+            const res = await fetchWithTimeout(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'x-goog-api-key': apiKeyClean
+              },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: 'Responde exactamente con el texto: OK' }] }],
+                generationConfig: { temperature: 0, maxOutputTokens: 20 }
+              })
+            }, 30000);
+
+            if (res.ok) {
+              const data = await res.json();
+              const txt = extractGeminiText(data);
+              if (txt && txt.trim()) {
+                geminiKeyStatus.textContent = `✅ Gemini responde correctamente con "${model}".`;
+                geminiKeyStatus.style.color = 'var(--success)';
+                showToast(`✅ Gemini OK (${model})`);
+
+                if (model !== geminiModelSelect.value) {
+                  const opt = [...geminiModelSelect.options].find(o => o.value === model);
+                  if (opt) {
+                    geminiModelSelect.value = model;
+                    memoriaTemporal.guardar(LS_KEY_GEMINI_MODEL, model);
+                    showToast(`✅ Modelo ajustado a "${model}"`);
+                  }
+                }
+                return;
+              }
+              lastErr = new Error('Respuesta vacía');
+              continue;
             }
-          } else {
+
             const errData = await res.json().catch(() => ({}));
             const errMsg = errData?.error?.message || errData?.message || `HTTP ${res.status}`;
-            geminiKeyStatus.textContent = `❌ Error ${res.status}: ${errMsg}`;
-            geminiKeyStatus.style.color = 'var(--error)';
+            lastErr = new Error(`${res.status}: ${errMsg}`);
+
+            if (res.status === 404 || errMsg.toLowerCase().includes('not found')) {
+              console.warn(`[Test] "${model}" no existe, siguiente…`);
+              continue;
+            }
+            if (res.status === 400 && (errMsg.toLowerCase().includes('api key') || errMsg.toLowerCase().includes('api_key'))) {
+              geminiKeyStatus.textContent = `❌ API Key inválida. Verifícala en aistudio.google.com/apikey`;
+              geminiKeyStatus.style.color = 'var(--error)';
+              return;
+            }
+            if (res.status === 401 || res.status === 403) {
+              geminiKeyStatus.textContent = `❌ API Key sin permisos o revocada (HTTP ${res.status}).`;
+              geminiKeyStatus.style.color = 'var(--error)';
+              return;
+            }
+          } catch (fetchErr) {
+            lastErr = fetchErr;
+            console.warn(`[Test] Error con "${model}":`, fetchErr.message);
           }
-        } catch (err) {
-          geminiKeyStatus.textContent = `❌ ${err.message}`;
-          geminiKeyStatus.style.color = 'var(--error)';
         }
+
+        geminiKeyStatus.textContent = `❌ No se pudo conectar. ${lastErr?.message || 'Verifica tu conexión.'}`;
+        geminiKeyStatus.style.color = 'var(--error)';
       });
 
-      // ── Groq keys ──
       const keysInput = document.getElementById('groq-keys-input');
       const keysStatus = document.getElementById('keys-save-status');
       keysInput.value = GROQ_KEYS.join('\n');
@@ -873,7 +906,6 @@
 
       btnConfig.addEventListener('click', () => configPanel.classList.toggle('open'));
 
-      // ── Tabs ──
       tabs.forEach(tab => {
         tab.addEventListener('click', () => {
           tabs.forEach(t => t.classList.remove('active'));
@@ -887,7 +919,6 @@
         });
       });
 
-      // 🔥 FIX — Botón Grabar: abre modal primero, o detiene si ya está grabando
       btnStartRecord.addEventListener('click', () => {
         if (isRecordingActive) {
           stopRecordingProcess();
@@ -896,7 +927,6 @@
         }
       });
 
-      // 🔥 FIX — Botón Subir: abre modal primero
       btnUpload.addEventListener('click', () => {
         if (isRecordingActive) { showToast('Detén la grabación primero.'); return; }
         openModeSelectModal('upload');
@@ -927,7 +957,6 @@
         }
       });
 
-      // 🔥 Copiar transcripción
       document.getElementById('btn-copy-transcript').addEventListener('click', () => {
         const text = transcriptBox.value.trim();
         if (!text) { showToast('⚠️ No hay texto para copiar'); return; }
@@ -936,15 +965,12 @@
           .catch(() => showToast('⚠️ Error al copiar'));
       });
 
-      // 🔥 NUEVO — Analizar texto pegado manualmente
       btnAnalyzePasted.addEventListener('click', async () => {
         const text = transcriptBox.value.trim();
         if (!text || text.length < 20) {
           showToast('⚠️ Pega primero un texto para analizar (mínimo 20 caracteres).');
           return;
         }
-
-        // Si no hay modo elegido → pedirlo
         if (!currentSessionMode) {
           openModeSelectModal('analyze-pasted');
           return;
@@ -952,7 +978,6 @@
         await triggerAutoAnalysis();
       });
 
-      // 🔥 NUEVO — Limpiar transcripción manualmente
       btnClearTranscript.addEventListener('click', () => {
         if (!transcriptBox.value.trim()) return;
         if (confirm('¿Borrar la transcripción actual?')) {
@@ -966,9 +991,7 @@
         if (e.target.id === 'modal-overlay') closeModal();
       });
 
-      // 🔥 Modal de selección de modo
       initModeSelectModalListeners();
-
       renderProjectsTab();
 
       document.getElementById('btn-export-data').addEventListener('click', () => {
@@ -1087,16 +1110,13 @@
         const action = modeSelectState.pendingAction;
         if (!mode) return;
 
-        // Guardar el modo elegido como modo de la sesión actual
         currentSessionMode = mode;
         const modeDef = MODE_DEFINITIONS[mode];
         showToast(`🎯 Modo: ${modeDef.categoriaLabel}`);
 
-        // Cerrar modal
         modal.classList.remove('open');
         modeSelectState = { mode: null, pendingAction: null };
 
-        // Ejecutar la acción pendiente
         if (action === 'record') {
           startRecordingProcess();
         } else if (action === 'upload') {
@@ -1121,7 +1141,6 @@
     async function startRecordingProcess() {
       if (isRecordingActive) return;
 
-      // 🔥 Wake Lock
       await requestWakeLock();
 
       if (window.AndroidNative && typeof window.AndroidNative.startRecording === 'function') {
@@ -1188,7 +1207,6 @@
       if (!isRecordingActive) return;
       isRecordingActive = false;
 
-      // 🔥 Liberar Wake Lock
       releaseWakeLock();
 
       if (window.AndroidNative && typeof window.AndroidNative.stopRecording === 'function') {
@@ -1243,8 +1261,8 @@
         if (isNetworkError) {
           showToast('⚠️ Sin conexión. Tu audio está guardado en Música > MeetingMind', 8000);
           setStatus('error', '⚠️ Error de red — audio guardado en Música > MeetingMind');
-          const box = document.getElementById('transcript-box');
-          if (box) {
+          const area = document.getElementById('transcript-progress-area');
+          if (area) {
             const notice = document.createElement('div');
             notice.className = 'transcript-error';
             notice.innerHTML = `
@@ -1254,7 +1272,7 @@
               Cuando recuperes la conexión, toca <strong>📂 Subir Audios</strong> y selecciona
               el archivo desde esa carpeta para transcribirlo.
             `;
-            box.appendChild(notice);
+            area.appendChild(notice);
           }
         } else {
           showToast('❌ Error al procesar audio nativo: ' + msg);
@@ -1278,7 +1296,7 @@
     };
 
     // ═══════════════════════════════════════════════════════════════
-    // ✍️ TRANSCRIPCIÓN — Escribe en el textarea
+    // ✍️ TRANSCRIPCIÓN
     // ═══════════════════════════════════════════════════════════════
     function appendToTranscript(text) {
       const box = document.getElementById('transcript-box');
@@ -1304,7 +1322,6 @@
       );
 
       try {
-        isTranscribing = true;
         const transcript = await transcribeWithGroqChunked(file, (msg) => {
           const el = document.getElementById(id);
           const t = el ? el.querySelector('.progress-text') : null;
@@ -1315,14 +1332,11 @@
         if (transcript && transcript.trim()) {
           appendToTranscript(transcript.trim());
         }
-        isTranscribing = false;
         clearTranscriptProgress();
 
-        // 🔥 Auto-análisis después de transcribir
         await maybeAutoAnalyze();
 
       } catch (err) {
-        isTranscribing = false;
         const errDiv = document.createElement('div');
         errDiv.className = 'transcript-error';
         errDiv.innerHTML = `<span class="err-title">❌ Fallo al transcribir bloque</span>${escHtml(err.message)}`;
@@ -1411,7 +1425,6 @@
       cancelBtn.remove();
       globalTranscriptionController = null;
 
-      // 🔥 Auto-análisis después de subir archivos
       const hasContent = document.getElementById('transcript-box').value.trim().length > 0;
       if (hasContent && !signal.aborted) {
         await maybeAutoAnalyze();
@@ -1467,8 +1480,6 @@
         }
 
         const apiKey = getNextGroqKey();
-        const keyPreview = apiKey.slice(0, 12) + '…' + apiKey.slice(-4);
-        console.log(`[Whisper] Intento ${attempt + 1}/${GROQ_KEYS.length} | Key ${keyPreview}`);
 
         const formData = new FormData();
         formData.append('file', file);
@@ -1521,7 +1532,7 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🎯 AUTO-ANÁLISIS después de transcribir
+    // 🎯 AUTO-ANÁLISIS
     // ═══════════════════════════════════════════════════════════════
     async function maybeAutoAnalyze() {
       const text = document.getElementById('transcript-box').value.trim();
@@ -1540,7 +1551,6 @@
       document.querySelector('[data-tab="notas"]')?.click();
     }
 
-    // 🔥 Botón "Analizar Texto Pegado" — usa el modo actual
     async function triggerAutoAnalysis() {
       const text = document.getElementById('transcript-box').value.trim();
       if (!text || text.length < 20) {
@@ -1569,11 +1579,29 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🤖 GEMINI — Interactions API v1beta
+    // 🤖 GEMINI — Extracción robusta del texto
     // ═══════════════════════════════════════════════════════════════
     function extractGeminiText(data) {
       if (!data || typeof data !== 'object') return '';
-      if (typeof data.output_text === 'string' && data.output_text.trim()) return data.output_text;
+
+      const candidates = data.candidates;
+      if (Array.isArray(candidates) && candidates.length > 0) {
+        const parts = candidates[0]?.content?.parts;
+        if (Array.isArray(parts)) {
+          let text = '';
+          for (const p of parts) {
+            // Filtramos thoughts (razonamiento interno)
+            if (p?.thought === true) continue;
+            if (typeof p?.text === 'string') text += p.text;
+          }
+          if (text.trim()) return text;
+        }
+        const reason = candidates[0]?.finishReason;
+        if (reason && reason !== 'STOP') {
+          console.warn('[Gemini] finishReason:', reason);
+        }
+      }
+
       if (Array.isArray(data.steps)) {
         let text = '';
         for (const step of data.steps) {
@@ -1587,9 +1615,17 @@
         }
         if (text.trim()) return text;
       }
+
+      if (typeof data.output_text === 'string' && data.output_text.trim()) {
+        return data.output_text;
+      }
+
       return '';
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // 🤖 GEMINI — Llamada con fallback de modelos reales
+    // ═══════════════════════════════════════════════════════════════
     async function callGemini(systemPrompt, userContent, timeoutMs, options = {}) {
       const apiKey = String(GEMINI_API_KEY || '').trim();
 
@@ -1597,76 +1633,114 @@
         throw new Error('Gemini API Key no configurada o inválida. Ve a ⚙️ Configuración → 🔮 Gemini API Key.');
       }
 
-      const currentModel = (memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-3.8-flash')
+      const userModel = (memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-2.5-flash')
         .trim()
         .replace(/^models\//, '');
 
-      const payload = {
-        model: currentModel,
-        input: systemPrompt + '\n\n' + userContent
-      };
+      const modelsToTry = [
+        userModel,
+        'gemini-2.5-flash',
+        'gemini-2.5-flash-lite',
+        'gemini-flash-latest',
+        'gemini-2.5-pro',
+        'gemini-3.8-flash'
+      ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
-      if (options.responseFormat === 'json') {
-        payload.response_format = {
-          type: 'text',
-          mime_type: 'application/json'
+      let lastError = null;
+      let lastStatus = 0;
+
+      for (const currentModel of modelsToTry) {
+        const url = `${GEMINI_API_BASE}/${currentModel}:generateContent`;
+
+        const payload = {
+          contents: [{
+            parts: [{ text: systemPrompt + '\n\n' + userContent }]
+          }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 8192
+          }
         };
-      }
 
-      const response = await fetchWithTimeout(GEMINI_INTERACTIONS_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-          'Api-Revision': GEMINI_API_REVISION
-        },
-        body: JSON.stringify(payload)
-      }, timeoutMs || 120000);
-
-      if (response.ok) {
-        const data = await response.json();
-        const text = extractGeminiText(data);
-        if (text && text.trim()) return text;
-
-        if (data?.status === 'failed' || data?.errors) {
-          const errDetail = data.errors ? JSON.stringify(data.errors) : data.status;
-          throw new Error(`Gemini falló: ${errDetail}`);
+        if (options.responseFormat === 'json') {
+          payload.generationConfig.responseMimeType = 'application/json';
         }
-        if (data?.status === 'requires_action') {
-          throw new Error('Gemini solicitó una acción (function call). No soportado.');
+
+        let response;
+        try {
+          response = await fetchWithTimeout(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-goog-api-key': apiKey
+            },
+            body: JSON.stringify(payload)
+          }, timeoutMs || 120000);
+        } catch (fetchErr) {
+          lastError = fetchErr;
+          console.warn(`[Gemini] Error de red con "${currentModel}":`, fetchErr.message);
+          break;
         }
-        throw new Error('Respuesta vacía de Gemini.');
+
+        if (response.ok) {
+          const data = await response.json();
+          const text = extractGeminiText(data);
+          if (text && text.trim()) {
+            console.log(`[Gemini] ✅ Éxito con "${currentModel}"`);
+            return text;
+          }
+          const reason = data?.candidates?.[0]?.finishReason;
+          if (reason && reason !== 'STOP') {
+            throw new Error(`Gemini bloqueó la respuesta (${reason}). Intenta reformular el texto.`);
+          }
+          throw new Error('Respuesta vacía de Gemini.');
+        }
+
+        let errMsg = `HTTP ${response.status}`;
+        try {
+          const errData = await response.json();
+          errMsg = errData?.error?.message || errData?.message || errMsg;
+        } catch (_) {}
+
+        lastStatus = response.status;
+        const low = errMsg.toLowerCase();
+
+        if (response.status === 404 || (low.includes('not found') && low.includes('model'))) {
+          console.warn(`[Gemini] "${currentModel}" no existe. Siguiente…`);
+          lastError = new Error(`Modelo "${currentModel}" no disponible.`);
+          continue;
+        }
+
+        if (response.status === 400 && (low.includes('not supported') || low.includes('not supported for'))) {
+          console.warn(`[Gemini] "${currentModel}" no soporta generateContent. Siguiente…`);
+          lastError = new Error(`Modelo "${currentModel}" no soporta esta operación.`);
+          continue;
+        }
+
+        if (response.status === 400) {
+          if (low.includes('api key') || low.includes('api_key') || low.includes('invalid key')) {
+            throw new Error('Gemini API Key inválida. Revisa que sea correcta y sin espacios.');
+          }
+          throw new Error(`Solicitud inválida a Gemini: ${errMsg}`);
+        }
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('Gemini API Key sin permisos o revocada.');
+        }
+        if (response.status === 429) {
+          throw new Error('Límite de Gemini alcanzado. Espera un minuto e inténtalo de nuevo.');
+        }
+        if (response.status >= 500) {
+          lastError = new Error(`Error del servidor (${response.status}).`);
+          continue;
+        }
+
+        lastError = new Error(`Gemini: ${errMsg}`);
       }
 
-      let errMsg = `HTTP ${response.status}`;
-      try {
-        const errData = await response.json();
-        errMsg = errData?.error?.message || errData?.message || errMsg;
-      } catch (_) {}
-
-      const low = errMsg.toLowerCase();
-      if (response.status === 400) {
-        if (low.includes('api key') || low.includes('api_key') || low.includes('invalid key')) {
-          throw new Error('Gemini API Key inválida. Revisa que sea correcta (AIza… o AQ.…).');
-        }
-        if (low.includes('model') && (low.includes('not found') || low.includes('not supported'))) {
-          throw new Error(`El modelo "${currentModel}" no está disponible. Prueba otro en ⚙️ Configuración.`);
-        }
-        throw new Error(`Solicitud inválida a Gemini: ${errMsg}`);
+      if (lastStatus === 0) {
+        throw new Error(`No se pudo conectar con Gemini. Verifica tu conexión. (${lastError?.message || 'Desconocido'})`);
       }
-      if (response.status === 401 || response.status === 403) {
-        throw new Error('Gemini API Key sin permisos o revocada.');
-      }
-      if (response.status === 404) {
-        throw new Error(`Endpoint o modelo no encontrado ("${currentModel}").`);
-      }
-      if (response.status === 429) {
-        throw new Error('Límite de Gemini alcanzado. Espera un minuto.');
-      }
-      if (response.status >= 500) {
-        throw new Error(`Error del servidor de Gemini (${response.status}).`);
-      }
-      throw new Error(`Gemini: ${errMsg}`);
+      throw new Error(`Todos los modelos fallaron. Último: ${lastError?.message || `HTTP ${lastStatus}`}`);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -2166,7 +2240,6 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
       if (btnUpload) btnUpload.disabled = false;
       if (btnAnalyze) btnAnalyze.disabled = false;
 
-      // Mostrar botón clear si hay contenido
       const btnClear = document.getElementById('btn-clear');
       if (btnClear) {
         const hasContent = document.getElementById('transcript-box').value.trim().length > 0;
