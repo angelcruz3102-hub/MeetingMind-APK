@@ -259,11 +259,10 @@
 
     <label for="gemini-model-select">Modelo de Notas Inteligentes (Gemini)</label>
     <select id="gemini-model-select">
-      <option value="gemini-1.5-flash">✨ gemini-1.5-flash (rápido, recomendado)</option>
-      <option value="gemini-1.5-flash-8b">⚡ gemini-1.5-flash-8b (más rápido)</option>
-      <option value="gemini-1.5-pro">🧠 gemini-1.5-pro (más potente)</option>
-      <option value="gemini-2.0-flash-exp">🚀 gemini-2.0-flash-exp (experimental)</option>
-    </select>
+  <option value="gemini-3.5-flash-lite">✨ 3.5 Flash-Lite (Respuestas más rápidas)</option>
+  <option value="gemini-3.6-flash">⚡ 3.6 Flash (Asistencia general)</option>
+  <option value="gemini-3.1-pro">🧠 3.1 Pro (Razonamiento avanzado)</option>
+</select>
 
     <div class="key-divider">
       <label>🔮 Gemini API Key (para Notas Inteligentes)</label>
@@ -717,14 +716,25 @@
         ? GEMINI_API_KEY
         : '';
 
-      const savedModel = memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-1.5-flash';
-      if ([...geminiModelSelect.options].some(o => o.value === savedModel)) {
-        geminiModelSelect.value = savedModel;
-      }
-      geminiModelSelect.addEventListener('change', () => {
-        memoriaTemporal.guardar(LS_KEY_GEMINI_MODEL, geminiModelSelect.value);
-        showToast('✅ Modelo: ' + geminiModelSelect.value);
-      });
+      // ✅ DESPUÉS — Default migrado a 'gemini-3.6-flash'
+// y validación: si el modelo guardado en localStorage ya no existe (ej: modelo viejo "gemini-1.5-flash"),
+// se fuerza el nuevo default y se re-guarda.
+const GEMINI_MODEL_DEFAULT = 'gemini-3.6-flash';
+const savedModel = memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL);
+
+const modelExists = savedModel && [...geminiModelSelect.options].some(o => o.value === savedModel);
+if (modelExists) {
+  geminiModelSelect.value = savedModel;
+} else {
+  // El modelo guardado ya no existe en el listado → usar el nuevo default
+  geminiModelSelect.value = GEMINI_MODEL_DEFAULT;
+  memoriaTemporal.guardar(LS_KEY_GEMINI_MODEL, GEMINI_MODEL_DEFAULT);
+}
+
+geminiModelSelect.addEventListener('change', () => {
+  memoriaTemporal.guardar(LS_KEY_GEMINI_MODEL, geminiModelSelect.value);
+  showToast('✅ Modelo: ' + geminiModelSelect.value);
+});
 
       document.getElementById('btn-save-gemini-key').addEventListener('click', () => {
         const result = saveGeminiKey(geminiKeyInput.value);
@@ -749,8 +759,10 @@
             generationConfig: { responseMimeType: 'application/json', temperature: 0 }
           };
           // 🔥 FIX — trim() aplicado a la key antes de la URL
-          const apiKeyClean = String(GEMINI_API_KEY || '').trim();
-          const url = `${GEMINI_API_BASE}/${model}:generateContent?key=${apiKeyClean}`;
+         // ✅ DESPUÉS — Limpieza idéntica a callGemini
+const apiKeyClean = String(GEMINI_API_KEY || '').trim();
+const modelClean = String(model || 'gemini-3.6-flash').trim().replace(/^models\//, '');
+const url = `${GEMINI_API_BASE}/${modelClean}:generateContent?key=${apiKeyClean}`;
           const res = await fetchWithTimeout(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1634,71 +1646,80 @@ REGLAS ESPECIALES:
       return `${REGLAS_COMUNES}\n\n${reglasEspecificas}`;
     }
 
-    // ═══════════════════ 🔮 GEMINI CALL ═══════════════════
-    /* 🔥 FIX — Gemini call con key.trim() en la URL */
-    async function callGemini(systemPrompt, userContent, timeoutMs) {
-      // 🔥 FIX — Aplicamos .trim() ANTES de cualquier uso
-      const apiKey = String(GEMINI_API_KEY || '').trim();
+    /* 🔮 GEMINI CALL — Modelos 3.x + URL limpia con apiKey.trim() */
+async function callGemini(systemPrompt, userContent, timeoutMs) {
+  // 🔥 Key limpia (soporta AIza… o AQ.…)
+  const apiKey = String(GEMINI_API_KEY || '').trim();
 
-      if (!isValidGeminiKey(apiKey)) {
-        throw new Error('Gemini API Key no configurada o inválida. Ve a ⚙️ Configuración → 🔮 Gemini API Key y pega tu key (AIza… o AQ.…).');
-      }
+  if (!isValidGeminiKey(apiKey)) {
+    throw new Error('Gemini API Key no configurada o inválida. Ve a ⚙️ Configuración → 🔮 Gemini API Key y pega tu key (AIza… o AQ.…).');
+  }
 
-      const model = (memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-1.5-flash').trim();
+  // 🔥 Modelo limpio + default 3.6 Flash
+  const currentModel = (memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-3.6-flash')
+    .trim()
+    .replace(/^models\//, '');   // ← limpia prefijo "models/" si lo pegaron por error
 
-      // 🔥 FIX — URL con apiKey.trim() explícito
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
+  // 🔥 URL limpia con apiKey.trim() explícito
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey.trim()}`;
 
-      const payload = {
-        contents: [{
-          parts: [{ text: systemPrompt + '\n\n' + userContent }]
-        }],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          temperature: 0.2,
-          maxOutputTokens: 8192
-        }
-      };
-
-      const response = await fetchWithTimeout(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }, timeoutMs || 120000);
-
-      if (response.ok) {
-        const data = await response.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
-        const reason = data?.candidates?.[0]?.finishReason;
-        if (reason) throw new Error(`Gemini no devolvió texto (finishReason: ${reason}).`);
-        throw new Error('Respuesta vacía de Gemini.');
-      }
-
-      let errMsg = `HTTP ${response.status}`;
-      try {
-        const errData = await response.json();
-        errMsg = errData?.error?.message || errMsg;
-      } catch (_) {}
-
-      if (response.status === 400) {
-        // 🔥 FIX — Mensaje más claro diferenciando los dos formatos de key
-        if (errMsg.toLowerCase().includes('api key') || errMsg.toLowerCase().includes('api_key')) {
-          throw new Error('Gemini API Key inválida. Revisa que sea correcta (AIza… o AQ.…) y que no tenga espacios.');
-        }
-        throw new Error(`Solicitud inválida a Gemini: ${errMsg}`);
-      }
-      if (response.status === 401 || response.status === 403) {
-        throw new Error('Gemini API Key sin permisos o revocada.');
-      }
-      if (response.status === 429) {
-        throw new Error('Límite de Gemini alcanzado. Espera un minuto e inténtalo de nuevo.');
-      }
-      if (response.status >= 500) {
-        throw new Error(`Error del servidor de Gemini (${response.status}). Inténtalo de nuevo.`);
-      }
-      throw new Error(`Gemini: ${errMsg}`);
+  const payload = {
+    contents: [{
+      parts: [{ text: systemPrompt + '\n\n' + userContent }]
+    }],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      temperature: 0.2,
+      maxOutputTokens: 16384          // ← ampliado: los modelos 3.x soportan más salida
     }
+  };
+
+  const response = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  }, timeoutMs || 120000);
+
+  if (response.ok) {
+    const data = await response.json();
+    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (text) return text;
+    const reason = data?.candidates?.[0]?.finishReason;
+    if (reason) throw new Error(`Gemini no devolvió texto (finishReason: ${reason}).`);
+    throw new Error('Respuesta vacía de Gemini.');
+  }
+
+  let errMsg = `HTTP ${response.status}`;
+  try {
+    const errData = await response.json();
+    errMsg = errData?.error?.message || errMsg;
+  } catch (_) {}
+
+  if (response.status === 400) {
+    // Diferenciamos entre key inválida y modelo inválido
+    const low = errMsg.toLowerCase();
+    if (low.includes('api key') || low.includes('api_key')) {
+      throw new Error('Gemini API Key inválida. Revisa que sea correcta (AIza… o AQ.…) y que no tenga espacios.');
+    }
+    if (low.includes('model') && (low.includes('not found') || low.includes('not supported') || low.includes('unsupported'))) {
+      throw new Error(`El modelo "${currentModel}" no está disponible para tu API Key. Prueba con otro modelo en ⚙️ Configuración.`);
+    }
+    throw new Error(`Solicitud inválida a Gemini: ${errMsg}`);
+  }
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('Gemini API Key sin permisos o revocada.');
+  }
+  if (response.status === 404) {
+    throw new Error(`Modelo "${currentModel}" no encontrado. Cambia a otro en ⚙️ Configuración.`);
+  }
+  if (response.status === 429) {
+    throw new Error('Límite de Gemini alcanzado. Espera un minuto e inténtalo de nuevo.');
+  }
+  if (response.status >= 500) {
+    throw new Error(`Error del servidor de Gemini (${response.status}). Inténtalo de nuevo.`);
+  }
+  throw new Error(`Gemini: ${errMsg}`);
+}
 
     // ═══════════════════ JSON → MARKDOWN ═══════════════════
     function jsonNotesToMarkdown(obj) {
