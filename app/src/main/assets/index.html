@@ -55,10 +55,7 @@
     #groq-keys-input { width: 100%; min-height: 110px; background: var(--bg); color: var(--text); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 11px 14px; font-family: 'SFMono-Regular', Consolas, Menlo, monospace; font-size: 0.78rem; line-height: 1.6; outline: none; resize: vertical; -webkit-user-select: text; user-select: text; }
     #groq-keys-input:focus { border-color: var(--accent); }
 
-    #gemini-key-input { width: 100%; background: var(--bg); color: var(--text); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 11px 14px; font-family: 'SFMono-Regular', Consolas, Menlo, monospace; font-size: 0.82rem; outline: none; -webkit-user-select: text; user-select: text; min-height: 44px; }
-    #gemini-key-input:focus { border-color: var(--accent); }
-
-    #keys-save-status, #gemini-key-status { font-size: 0.75rem; margin-top: 8px; color: var(--muted); min-height: 1em; }
+    #keys-save-status { font-size: 0.75rem; margin-top: 8px; color: var(--muted); min-height: 1em; }
     .keys-btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
     .keys-btn-row .btn-secondary { flex: 1; min-width: 130px; font-size: 0.8rem; padding: 10px 14px; min-height: 44px; }
 
@@ -257,43 +254,20 @@
     <div class="logo">
       <span class="logo-icon">🧠</span>
       <span>Meeting Mind</span>
-      <span class="badge">GEMINI</span>
+      <span class="badge">GROQ</span>
     </div>
     <button id="btn-config">⚙️ Configuración</button>
   </header>
 
   <div id="config-panel">
 
-    <label for="gemini-model-select">Modelo de Notas Inteligentes (Gemini)</label>
-    <select id="gemini-model-select">
-      <option value="gemini-3.8-flash">✨ Gemini 3.8 Flash (Recomendado — última generación)</option>
-      <option value="gemini-3.7-flash">⚡ Gemini 3.7 Flash</option>
-      <option value="gemini-3.6-flash">💫 Gemini 3.6 Flash</option>
-      <option value="gemini-3.5-flash">💡 Gemini 3.5 Flash</option>
-      <option value="gemini-3.5-flash-lite">🌱 Gemini 3.5 Flash-Lite (ligero)</option>
-      <option value="gemini-3.1-pro-preview">🧠 Gemini 3.1 Pro Preview (razonamiento)</option>
+    <label for="model-select">Modelo de Notas Inteligentes (Groq)</label>
+    <select id="model-select">
+      <option value="llama-3.3-70b-versatile">🧠 llama-3.3-70b-versatile (Recomendado)</option>
+      <option value="llama-3.1-70b-versatile">⚡ llama-3.1-70b-versatile</option>
+      <option value="llama3-70b-8192">💫 llama3-70b-8192</option>
+      <option value="llama3-8b-8192">🌱 llama3-8b-8192 (ligero)</option>
     </select>
-
-    <div class="key-divider">
-      <label>🔮 Gemini API Key (para Notas Inteligentes)</label>
-      <p style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;line-height:1.5;">
-        Consigue tu key gratis en <strong>aistudio.google.com/apikey</strong>.
-        Puede empezar por <code style="background:rgba(135,131,120,0.15);padding:1px 5px;border-radius:3px;">AIza</code>
-        o por <code style="background:rgba(135,131,120,0.15);padding:1px 5px;border-radius:3px;">AQ.</code>.
-        Se guarda localmente y <strong>persiste entre actualizaciones del APK</strong>.
-      </p>
-      <input type="password" id="gemini-key-input"
-             placeholder="AIzaSy... o AQ.Ab8..."
-             spellcheck="false"
-             autocapitalize="off"
-             autocomplete="off"
-             autocorrect="off" />
-      <div class="keys-btn-row">
-        <button id="btn-save-gemini-key" class="btn-secondary">💾 Guardar</button>
-        <button id="btn-test-gemini" class="btn-secondary">🧪 Probar</button>
-      </div>
-      <div id="gemini-key-status"></div>
-    </div>
 
     <div class="key-divider">
       <label>Copia de Seguridad</label>
@@ -305,9 +279,9 @@
     </div>
 
     <div class="key-divider">
-      <label>🎙️ Groq API Keys (solo para Transcripción Whisper)</label>
+      <label>🎙️ Groq API Keys</label>
       <p style="font-size:0.72rem;color:var(--muted);margin-bottom:10px;line-height:1.5;">
-        Estas keys se usan <strong>únicamente</strong> para transcribir audios con Whisper. Pega una key por línea.
+        Estas keys se usan para <strong>Whisper</strong> (transcripción de audio) y para <strong>las Notas Inteligentes</strong>. Pega una key por línea.
       </p>
       <textarea id="groq-keys-input"
                 placeholder="gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx&#10;gsk_yyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
@@ -323,7 +297,7 @@
     </div>
 
     <div class="key-divider">
-      <label>🔬 Diagnóstico de conexión (Groq/Whisper)</label>
+      <label>🔬 Diagnóstico de conexión</label>
       <div style="margin-top: 10px;">
         <button id="btn-test-apis" class="btn-secondary" style="font-size: 0.8rem; padding: 9px 12px; min-height: 44px; width: 100%;">
           🔬 Probar las <span id="keys-count-diag">2</span> Groq API Keys
@@ -432,53 +406,7 @@
 
   <script>
     // ═══════════════════════════════════════════════════════════════
-    // 🔮 GEMINI — Interactions API (v1beta)
-    // ═══════════════════════════════════════════════════════════════
-    const GEMINI_API_KEY_DEFAULT = 'PEGA_AQUI_TU_API_KEY_DE_GEMINI';
-
-    const LS_KEY_GEMINI_API = 'meetingmind_gemini_api_key';
-    const LS_KEY_GEMINI_MODEL = 'meetingmind_gemini_model';
-
-    // 🔥 NUEVO — Endpoint de la Interactions API
-    const GEMINI_INTERACTIONS_URL = 'https://generativelanguage.googleapis.com/v1beta/interactions';
-    const GEMINI_API_REVISION = '2026-05-20';
-
-    function isValidGeminiKey(k) {
-      if (typeof k !== 'string') return false;
-      const trimmed = k.trim();
-      if (trimmed.length < 20) return false;
-      return trimmed.startsWith('AIza') || trimmed.startsWith('AQ.');
-    }
-
-    function loadGeminiKey() {
-      try {
-        const stored = localStorage.getItem(LS_KEY_GEMINI_API);
-        if (stored) {
-          const cleaned = stored.trim();
-          if (isValidGeminiKey(cleaned)) return cleaned;
-        }
-      } catch (e) {}
-      return GEMINI_API_KEY_DEFAULT;
-    }
-
-    let GEMINI_API_KEY = loadGeminiKey();
-
-    function saveGeminiKey(key) {
-      const cleaned = (key || '').trim();
-      if (!isValidGeminiKey(cleaned)) {
-        return { ok: false, error: 'La key debe empezar por "AIza" o "AQ." y tener al menos 20 caracteres.' };
-      }
-      try {
-        localStorage.setItem(LS_KEY_GEMINI_API, cleaned);
-        GEMINI_API_KEY = cleaned;
-        return { ok: true };
-      } catch (e) {
-        return { ok: false, error: e.message };
-      }
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // 🎙️ GROQ — Whisper (transcripción de audio)
+    // 🎙️ GROQ — Keys y endpoints
     // ═══════════════════════════════════════════════════════════════
     const GROQ_KEYS_DEFAULT = [
       "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",
@@ -486,6 +414,13 @@
     ];
 
     const LS_KEY_GROQ_KEYS = 'meetingmind_groq_keys';
+    const LS_KEY_MODEL = 'meetingmind_groq_text_model';
+    const LS_KEY_PROJECTS = 'meetingmind_projects';
+    const LS_KEY_CHECKBOX = 'meetingmind_notion_checkboxes';
+
+    const GROQ_AUDIO_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
+    const GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions';
+    const GROQ_MODELS_URL = 'https://api.groq.com/openai/v1/models';
 
     function isValidGroqKey(k) {
       return typeof k === 'string' && k.trim().startsWith('gsk_') && k.trim().length > 20;
@@ -496,9 +431,7 @@
         const stored = localStorage.getItem(LS_KEY_GROQ_KEYS);
         if (stored) {
           const parsed = JSON.parse(stored);
-          if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(isValidGroqKey)) {
-            return parsed;
-          }
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(isValidGroqKey)) return parsed;
         }
       } catch (e) {}
       return [...GROQ_KEYS_DEFAULT];
@@ -519,6 +452,7 @@
         localStorage.setItem(LS_KEY_GROQ_KEYS, JSON.stringify(cleaned));
         GROQ_KEYS = cleaned;
         groqKeyIndex = 0;
+        cachedAvailableModels = null;
         return { ok: true, count: cleaned.length };
       } catch (e) {
         return { ok: false, error: e.message };
@@ -529,6 +463,7 @@
       try { localStorage.removeItem(LS_KEY_GROQ_KEYS); } catch (e) {}
       GROQ_KEYS = [...GROQ_KEYS_DEFAULT];
       groqKeyIndex = 0;
+      cachedAvailableModels = null;
     }
 
     function updateKeysCountUI() {
@@ -536,12 +471,9 @@
       if (el) el.textContent = GROQ_KEYS.length;
     }
 
-    const GROQ_AUDIO_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
-    const GROQ_MODELS_URL = 'https://api.groq.com/openai/v1/models';
-
-    const LS_KEY_PROJECTS = 'meetingmind_projects';
-    const LS_KEY_CHECKBOX = 'meetingmind_notion_checkboxes';
-
+    // ═══════════════════════════════════════════════════════════════
+    // 📋 MODOS DE SESIÓN
+    // ═══════════════════════════════════════════════════════════════
     const MODE_DEFINITIONS = {
       academico: {
         categoria: 'academico', categoriaLabel: 'Académico',
@@ -568,6 +500,57 @@
         isLanguageFocus: false
       }
     };
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🔥 CHUNKING — Anti TPM para Groq
+    // ═══════════════════════════════════════════════════════════════
+    const WORDS_PER_CHUNK = 1200;
+
+    function splitIntoWordChunks(text, wordsPerChunk = WORDS_PER_CHUNK) {
+      const clean = String(text || '').trim();
+      if (!clean) return [];
+      const words = clean.split(/\s+/).filter(Boolean);
+      if (words.length <= wordsPerChunk) return [clean];
+      const chunks = [];
+      for (let i = 0; i < words.length; i += wordsPerChunk) {
+        chunks.push(words.slice(i, i + wordsPerChunk).join(' '));
+      }
+      return chunks;
+    }
+
+    function mergeJsonNotes(jsonNotesArray) {
+      if (!Array.isArray(jsonNotesArray) || jsonNotesArray.length === 0) return null;
+      if (jsonNotesArray.length === 1) return jsonNotesArray[0];
+
+      const merged = {
+        titulo_principal: jsonNotesArray[0]?.titulo_principal || 'Apuntes de la sesión',
+        secciones: []
+      };
+      const sectionMap = new Map();
+
+      for (const notes of jsonNotesArray) {
+        if (!notes || !Array.isArray(notes.secciones)) continue;
+        for (const sec of notes.secciones) {
+          const title = sec.titulo_seccion || 'Sección';
+          const key = title.toLowerCase().trim();
+          if (!sectionMap.has(key)) {
+            sectionMap.set(key, {
+              titulo_seccion: title,
+              tipo_contenido: sec.tipo_contenido || 'lista',
+              contenido: []
+            });
+          }
+          const target = sectionMap.get(key);
+          const items = Array.isArray(sec.contenido) ? sec.contenido : [];
+          for (const it of items) {
+            const s = String(it).trim();
+            if (s && !target.contenido.includes(s)) target.contenido.push(s);
+          }
+        }
+      }
+      merged.secciones = Array.from(sectionMap.values());
+      return merged;
+    }
 
     function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -630,6 +613,71 @@
       txt.textContent = text;
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // 🎯 SELECCIÓN DINÁMICA DE MODELOS (filtro safeguard/llava)
+    // ═══════════════════════════════════════════════════════════════
+    let cachedAvailableModels = null;
+    async function fetchAvailableModels(forceRefresh = false) {
+      if (cachedAvailableModels && !forceRefresh) return cachedAvailableModels;
+      try {
+        const response = await fetchWithTimeout(GROQ_MODELS_URL, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${GROQ_KEYS[0]}` }
+        }, 20000);
+        if (!response.ok) {
+          cachedAvailableModels = ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile'];
+          return cachedAvailableModels;
+        }
+        const data = await response.json();
+        const ids = (data.data || []).map(m => m.id);
+
+        // 🔥 Filtro: excluir whisper, guards, visión, etc.
+        const valid = ids.filter(id => {
+          const low = id.toLowerCase();
+          return !low.includes('whisper') &&
+                 !low.includes('prompt-guard') &&
+                 !low.includes('safeguard') &&
+                 !low.includes('llava') &&
+                 !low.includes('vision') &&
+                 !low.includes('tts') &&
+                 !low.includes('embed') &&
+                 !low.includes('guard');
+        });
+
+        const prioridad = [
+          'llama-3.3-70b-versatile',
+          'llama-3.1-70b-versatile',
+          'llama3-70b-8192',
+          'llama3-8b-8192'
+        ];
+
+        const preferred = [];
+        for (const p of prioridad) {
+          if (valid.includes(p) && !preferred.includes(p)) preferred.push(p);
+        }
+        for (const id of valid) {
+          if (preferred.length >= 4) break;
+          const low = id.toLowerCase();
+          if (!preferred.includes(id) &&
+              (low.includes('llama') || low.includes('mixtral') ||
+               low.includes('gemma') || low.includes('gpt-oss'))) {
+            preferred.push(id);
+          }
+        }
+
+        cachedAvailableModels = preferred.length > 0
+          ? preferred
+          : ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile'];
+
+        console.log('[fetchAvailableModels] Modelos válidos:', cachedAvailableModels);
+        return cachedAvailableModels;
+      } catch (err) {
+        console.error('Error obteniendo modelos:', err);
+        cachedAvailableModels = ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile'];
+        return cachedAvailableModels;
+      }
+    }
+
     const memoriaTemporal = {
       datos: {},
       guardar(c, v) { try { localStorage.setItem(c, v); } catch (e) { this.datos[c] = v; } },
@@ -649,6 +697,9 @@
     let modeSelectState = { mode: null, pendingAction: null };
     let wakeLock = null;
 
+    // ═══════════════════════════════════════════════════════════════
+    // 🔥 WAKE LOCK
+    // ═══════════════════════════════════════════════════════════════
     async function requestWakeLock() {
       const notice = document.getElementById('wake-lock-notice');
       try {
@@ -682,7 +733,7 @@
     function initUI() {
       const btnConfig = document.getElementById('btn-config');
       const configPanel = document.getElementById('config-panel');
-      const geminiModelSelect = document.getElementById('gemini-model-select');
+      const modelSelect = document.getElementById('model-select');
       const btnStartRecord = document.getElementById('btn-start-record');
       const btnUpload = document.getElementById('btn-upload');
       const btnClear = document.getElementById('btn-clear');
@@ -693,138 +744,21 @@
       const tabs = document.querySelectorAll('.tab');
       const tabPanes = document.querySelectorAll('.tab-pane');
 
-      const geminiKeyInput = document.getElementById('gemini-key-input');
-      const geminiKeyStatus = document.getElementById('gemini-key-status');
-      geminiKeyInput.value = (GEMINI_API_KEY && GEMINI_API_KEY !== GEMINI_API_KEY_DEFAULT && isValidGeminiKey(GEMINI_API_KEY))
-        ? GEMINI_API_KEY
-        : '';
-
-      const GEMINI_MODEL_DEFAULT = 'gemini-3.8-flash';
-      const savedModel = memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL);
-      const modelExists = savedModel && [...geminiModelSelect.options].some(o => o.value === savedModel);
-      if (modelExists) {
-        geminiModelSelect.value = savedModel;
-      } else {
-        geminiModelSelect.value = GEMINI_MODEL_DEFAULT;
-        memoriaTemporal.guardar(LS_KEY_GEMINI_MODEL, GEMINI_MODEL_DEFAULT);
-      }
-      geminiModelSelect.addEventListener('change', () => {
-        memoriaTemporal.guardar(LS_KEY_GEMINI_MODEL, geminiModelSelect.value);
-        showToast('✅ Modelo: ' + geminiModelSelect.value);
-      });
-
-      document.getElementById('btn-save-gemini-key').addEventListener('click', () => {
-        const result = saveGeminiKey(geminiKeyInput.value);
-        if (result.ok) {
-          geminiKeyStatus.textContent = '✅ Gemini API Key guardada correctamente.';
-          geminiKeyStatus.style.color = 'var(--success)';
-          showToast('✅ Key de Gemini guardada');
-        } else {
-          geminiKeyStatus.textContent = '⚠️ ' + result.error;
-          geminiKeyStatus.style.color = 'var(--error)';
-          showToast('⚠️ ' + result.error);
-        }
-      });
-
-      // 🔥 Botón Probar — Interactions API
-      document.getElementById('btn-test-gemini').addEventListener('click', async () => {
-        geminiKeyStatus.textContent = '🧪 Probando conexión con Gemini (Interactions API)…';
-        geminiKeyStatus.style.color = 'var(--muted)';
-
-        const apiKeyClean = String(GEMINI_API_KEY || '').trim();
-
-        if (!isValidGeminiKey(apiKeyClean)) {
-          geminiKeyStatus.textContent = '❌ Gemini API Key no configurada. Pégala arriba y pulsa Guardar.';
-          geminiKeyStatus.style.color = 'var(--error)';
-          return;
-        }
-
-        const testModels = [
-          geminiModelSelect.value,
-          'gemini-3.8-flash',
-          'gemini-3.7-flash',
-          'gemini-3.6-flash',
-          'gemini-3.5-flash',
-          'gemini-3.5-flash-lite',
-          'gemini-3.1-pro-preview'
-        ].filter((m, i, arr) => m && arr.indexOf(m) === i);
-
-        let lastErr = null;
-
-        for (const rawModel of testModels) {
-          const model = rawModel.trim().replace(/^models\//, '');
-
-          try {
-            geminiKeyStatus.textContent = `🧪 Probando "${model}"…`;
-            const res = await fetchWithTimeout(GEMINI_INTERACTIONS_URL, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-goog-api-key': apiKeyClean,
-                'Api-Revision': GEMINI_API_REVISION
-              },
-              body: JSON.stringify({
-                model: model,
-                input: 'Responde exactamente con el texto: OK'
-              })
-            }, 30000);
-
-            if (res.ok) {
-              const data = await res.json();
-              const txt = extractGeminiText(data);
-              if (txt && txt.trim()) {
-                geminiKeyStatus.textContent = `✅ Gemini responde correctamente con "${model}".`;
-                geminiKeyStatus.style.color = 'var(--success)';
-                showToast(`✅ Gemini OK (${model})`);
-
-                if (model !== geminiModelSelect.value) {
-                  const opt = [...geminiModelSelect.options].find(o => o.value === model);
-                  if (opt) {
-                    geminiModelSelect.value = model;
-                    memoriaTemporal.guardar(LS_KEY_GEMINI_MODEL, model);
-                    showToast(`✅ Modelo ajustado a "${model}"`);
-                  }
-                }
-                return;
-              }
-              lastErr = new Error('Respuesta vacía');
-              continue;
-            }
-
-            const errData = await res.json().catch(() => ({}));
-            const errMsg = errData?.error?.message || errData?.message || `HTTP ${res.status}`;
-            lastErr = new Error(`${res.status}: ${errMsg}`);
-
-            if (res.status === 404 || errMsg.toLowerCase().includes('not found')) {
-              console.warn(`[Test] "${model}" no existe, siguiente…`);
-              continue;
-            }
-            if (res.status === 503 || res.status === 502 || res.status === 504) {
-              await new Promise(r => setTimeout(r, 1200));
-              continue;
-            }
-            if (res.status === 429) {
-              await new Promise(r => setTimeout(r, 2000));
-              continue;
-            }
-            if (res.status === 400 && (errMsg.toLowerCase().includes('api key') || errMsg.toLowerCase().includes('api_key'))) {
-              geminiKeyStatus.textContent = `❌ API Key inválida. Verifícala en aistudio.google.com/apikey`;
-              geminiKeyStatus.style.color = 'var(--error)';
-              return;
-            }
-            if (res.status === 401 || res.status === 403) {
-              geminiKeyStatus.textContent = `❌ API Key sin permisos o revocada (HTTP ${res.status}).`;
-              geminiKeyStatus.style.color = 'var(--error)';
-              return;
-            }
-          } catch (fetchErr) {
-            lastErr = fetchErr;
-            console.warn(`[Test] Error con "${model}":`, fetchErr.message);
+      // Cargar modelos dinámicos de Groq
+      fetchAvailableModels().then(models => {
+        if (models.length > 0) {
+          modelSelect.innerHTML = models.map(m => `<option value="${m}">🧠 ${m}</option>`).join('');
+          const saved = memoriaTemporal.obtener(LS_KEY_MODEL);
+          if (saved && models.includes(saved)) modelSelect.value = saved;
+          else {
+            modelSelect.value = models[0];
+            memoriaTemporal.guardar(LS_KEY_MODEL, models[0]);
           }
         }
-
-        geminiKeyStatus.textContent = `❌ No se pudo conectar. ${lastErr?.message || 'Verifica tu conexión.'}`;
-        geminiKeyStatus.style.color = 'var(--error)';
+      });
+      modelSelect.addEventListener('change', () => {
+        memoriaTemporal.guardar(LS_KEY_MODEL, modelSelect.value);
+        showToast('✅ Modelo: ' + modelSelect.value);
       });
 
       const keysInput = document.getElementById('groq-keys-input');
@@ -836,7 +770,7 @@
         const lines = keysInput.value.split('\n').map(s => s.trim()).filter(Boolean);
         const result = saveGroqKeys(lines);
         if (result.ok) {
-          keysStatus.textContent = `✅ ${result.count} key(s) guardada(s) para Whisper.`;
+          keysStatus.textContent = `✅ ${result.count} key(s) guardada(s).`;
           keysStatus.style.color = 'var(--success)';
           updateKeysCountUI();
           showToast(`✅ ${result.count} key(s) guardada(s)`);
@@ -983,7 +917,7 @@
           const resultEl = document.getElementById('diag-result');
           resultEl.style.display = 'block';
           resultEl.className = 'diag-result';
-          resultEl.textContent = `🔬 Probando las ${GROQ_KEYS.length} Groq API Keys (Whisper)...\n\n`;
+          resultEl.textContent = `🔬 Probando las ${GROQ_KEYS.length} Groq API Keys...\n\n`;
 
           let okCount = 0;
           const lines = [];
@@ -1025,6 +959,9 @@
       }
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // 🎯 MODAL DE SELECCIÓN DE MODO
+    // ═══════════════════════════════════════════════════════════════
     function initModeSelectModalListeners() {
       const modal = document.getElementById('mode-select-modal');
       const chips = document.querySelectorAll('#mode-select-chips .prompt-cat-chip');
@@ -1492,188 +1429,6 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🤖 GEMINI — Extracción robusta del texto
-    // ═══════════════════════════════════════════════════════════════
-    function extractGeminiText(data) {
-      if (!data || typeof data !== 'object') return '';
-
-      // 🔥 Interactions API: steps[].content[].text
-      if (Array.isArray(data.steps)) {
-        let text = '';
-        for (const step of data.steps) {
-          if (step.type === 'model_output' && Array.isArray(step.content)) {
-            for (const block of step.content) {
-              if (block.type === 'text' && typeof block.text === 'string') {
-                text += block.text;
-              }
-            }
-          }
-        }
-        if (text.trim()) return text;
-      }
-
-      // Convenience property (SDK)
-      if (typeof data.output_text === 'string' && data.output_text.trim()) {
-        return data.output_text;
-      }
-
-      // Fallback: legacy candidates[0].content.parts[0].text
-      const candidates = data.candidates;
-      if (Array.isArray(candidates) && candidates.length > 0) {
-        const parts = candidates[0]?.content?.parts;
-        if (Array.isArray(parts)) {
-          let text = '';
-          for (const p of parts) {
-            if (p?.thought === true) continue;
-            if (typeof p?.text === 'string') text += p.text;
-          }
-          if (text.trim()) return text;
-        }
-      }
-
-      return '';
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // 🤖 GEMINI — Interactions API con fallback de modelos 3.x
-    // ═══════════════════════════════════════════════════════════════
-    async function callGemini(systemPrompt, userContent, timeoutMs, options = {}) {
-      const apiKey = String(GEMINI_API_KEY || '').trim();
-
-      if (!isValidGeminiKey(apiKey)) {
-        throw new Error('Gemini API Key no configurada o inválida. Ve a ⚙️ Configuración → 🔮 Gemini API Key.');
-      }
-
-      const userModel = (memoriaTemporal.obtener(LS_KEY_GEMINI_MODEL) || 'gemini-3.8-flash')
-        .trim()
-        .replace(/^models\//, '');
-
-      // 🔥 Solo modelos Gemini 3.x disponibles en Interactions API
-      const modelsToTry = [
-        userModel,
-        'gemini-3.8-flash',
-        'gemini-3.7-flash',
-        'gemini-3.6-flash',
-        'gemini-3.5-flash',
-        'gemini-3.5-flash-lite',
-        'gemini-3.1-pro-preview',
-        'gemini-3-flash-preview'
-      ].filter((m, i, arr) => m && arr.indexOf(m) === i);
-
-      let lastError = null;
-      let lastStatus = 0;
-
-      for (const currentModel of modelsToTry) {
-        const payload = {
-          model: currentModel,
-          input: systemPrompt + '\n\n' + userContent
-        };
-
-        if (options.responseFormat === 'json') {
-          payload.response_format = [
-            {
-              type: 'text',
-              mime_type: 'application/json'
-            }
-          ];
-        }
-
-        let response;
-        try {
-          response = await fetchWithTimeout(GEMINI_INTERACTIONS_URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-goog-api-key': apiKey,
-              'Api-Revision': GEMINI_API_REVISION
-            },
-            body: JSON.stringify(payload)
-          }, timeoutMs || 120000);
-        } catch (fetchErr) {
-          lastError = fetchErr;
-          console.warn(`[Gemini] Error de red con "${currentModel}":`, fetchErr.message);
-          break;
-        }
-
-        if (response.ok) {
-          const data = await response.json();
-          const text = extractGeminiText(data);
-          if (text && text.trim()) {
-            console.log(`[Gemini] ✅ Éxito con "${currentModel}" (Interactions API)`);
-            return text;
-          }
-          if (data?.status === 'failed' || data?.errors) {
-            const errDetail = data.errors ? JSON.stringify(data.errors) : data.status;
-            throw new Error(`Gemini falló: ${errDetail}`);
-          }
-          throw new Error('Respuesta vacía de Gemini.');
-        }
-
-        let errMsg = `HTTP ${response.status}`;
-        try {
-          const errData = await response.json();
-          errMsg = errData?.error?.message || errData?.message || errMsg;
-        } catch (_) {}
-
-        lastStatus = response.status;
-        const low = errMsg.toLowerCase();
-
-        // Modelo no existe → siguiente
-        if (response.status === 404 || (low.includes('not found') && low.includes('model'))) {
-          console.warn(`[Gemini] "${currentModel}" no existe. Siguiente…`);
-          lastError = new Error(`Modelo "${currentModel}" no disponible.`);
-          continue;
-        }
-
-        // Modelo no soportado → siguiente
-        if (response.status === 400 && (low.includes('not supported') || low.includes('no longer available'))) {
-          console.warn(`[Gemini] "${currentModel}" no soportado. Siguiente…`);
-          lastError = new Error(`Modelo "${currentModel}" no soportado.`);
-          continue;
-        }
-
-        if (response.status === 400) {
-          if (low.includes('api key') || low.includes('api_key') || low.includes('invalid key')) {
-            throw new Error('Gemini API Key inválida. Revisa que sea correcta y sin espacios.');
-          }
-          if (low.includes('revision')) {
-            throw new Error('Versión de API no soportada. Actualiza la app.');
-          }
-          throw new Error(`Solicitud inválida a Gemini: ${errMsg}`);
-        }
-        if (response.status === 401 || response.status === 403) {
-          throw new Error('Gemini API Key sin permisos o revocada.');
-        }
-        if (response.status === 429) {
-          console.warn(`[Gemini] "${currentModel}" rate limit. Esperando…`);
-          lastError = new Error(`Rate limit alcanzado.`);
-          await delay(2000);
-          continue;
-        }
-        if (response.status >= 500) {
-          const waitMs = response.status === 503 ? 1200 : 800;
-          console.warn(`[Gemini] "${currentModel}" devolvió ${response.status}. Esperando ${waitMs}ms…`);
-          lastError = new Error(`Servidor saturado (${response.status}).`);
-          await delay(waitMs);
-          continue;
-        }
-
-        lastError = new Error(`Gemini: ${errMsg}`);
-      }
-
-      if (lastStatus === 0) {
-        throw new Error(`No se pudo conectar con Gemini. Verifica tu conexión a internet.`);
-      }
-      if (lastStatus === 503 || lastStatus === 502 || lastStatus === 504) {
-        throw new Error('Los servidores de Gemini están saturados (503). Espera 1-2 minutos y reintenta.');
-      }
-      if (lastStatus === 429) {
-        throw new Error('Límite temporal de Gemini alcanzado. Espera un minuto.');
-      }
-      throw new Error(`Todos los modelos fallaron. Último: ${lastError?.message || `HTTP ${lastStatus}`}`);
-    }
-
-    // ═══════════════════════════════════════════════════════════════
     // 🎓 SYSTEM PROMPTS
     // ═══════════════════════════════════════════════════════════════
     function getSystemPromptForMode(mode, isLanguageFocus) {
@@ -1747,6 +1502,66 @@ ESTRUCTURA: Resumen General, Ideas Principales, Citas, Notas, Reflexiones.`
 
       const reglasEspecificas = REGLAS_MODO[mode] || REGLAS_MODO.academico;
       return `${REGLAS_COMUNES}\n\n${reglasEspecificas}`;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🤖 GROQ CHAT — Con chunking
+    // ═══════════════════════════════════════════════════════════════
+    async function callGroqChat(payload) {
+      const dynamicModels = await fetchAvailableModels();
+      const modelsToTry = [...new Set([payload.model, ...dynamicModels])].filter(Boolean);
+
+      let lastError = null;
+      const maxAttempts = modelsToTry.length * GROQ_KEYS.length;
+      let attemptCount = 0;
+
+      for (const model of modelsToTry) {
+        const currentPayload = { ...payload, model };
+        for (let ka = 0; ka < GROQ_KEYS.length; ka++) {
+          if (attemptCount >= maxAttempts) break;
+          attemptCount++;
+          const apiKey = getNextGroqKey();
+          try {
+            const response = await fetchWithTimeout(GROQ_CHAT_URL, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+              },
+              body: JSON.stringify(currentPayload)
+            }, 90000);
+
+            if (response.ok) {
+              const data = await response.json();
+              const content = data?.choices?.[0]?.message?.content;
+              if (content) return content;
+              throw new Error('Respuesta vacía del modelo');
+            }
+
+            let errMsg = `HTTP ${response.status}`;
+            try {
+              const errData = await response.json();
+              errMsg = errData?.error?.message || errMsg;
+            } catch (_) {}
+
+            if (response.status === 429) {
+              lastError = new Error(`[Rate Limit] ${errMsg}`);
+              await delay(2000 * (ka + 1));
+              continue;
+            }
+            lastError = new Error(errMsg);
+            break;
+          } catch (err) {
+            lastError = err;
+            if (err.message.startsWith('Error de red') || err.message.includes('timeout')) {
+              await delay(1500 * (ka + 1));
+              continue;
+            }
+            break;
+          }
+        }
+      }
+      throw new Error(`Todos los modelos y claves fallaron. Último: ${lastError?.message || 'Desconocido'}`);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1954,7 +1769,7 @@ ESTRUCTURA: Resumen General, Ideas Principales, Citas, Notas, Reflexiones.`
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // ✨ ANÁLISIS CON GEMINI
+    // ✨ ANÁLISIS CON GROQ — Con chunking anti TPM
     // ═══════════════════════════════════════════════════════════════
     async function analyzeText(text, notesContainer, options) {
       const systemPrompt = getSystemPromptForMode(
@@ -1966,48 +1781,80 @@ ESTRUCTURA: Resumen General, Ideas Principales, Citas, Notas, Reflexiones.`
       notesContainer.innerHTML = `
         <div class="state-msg">
           <span class="big">✨</span>
-          <span id="notion-progress">Generando notas con Gemini…</span>
+          <span id="notion-progress">Generando notas con Groq…</span>
         </div>
       `;
-      setStatus('loading', 'Generando notas con Gemini…');
+      setStatus('loading', 'Generando notas con Groq…');
+
+      const currentModel = memoriaTemporal.obtener(LS_KEY_MODEL) || 'llama-3.3-70b-versatile';
 
       try {
-        const userMessage = `${options.isLanguageFocus
-          ? 'Enfoque adicional: CLASE DE IDIOMAS.\n\n'
-          : ''}Contexto: ${options.contexto.join(', ')}
-Enfoque: ${options.enfoque.join(', ')}
+        const totalWords = String(text || '').trim().split(/\s+/).filter(Boolean).length;
+        const chunks = splitIntoWordChunks(text, WORDS_PER_CHUNK);
 
-TRANSCRIPCIÓN COMPLETA:
+        console.log(`[analyzeText] ${totalWords} palabras → ${chunks.length} chunk(s)`);
+
+        if (chunks.length === 0) throw new Error('La transcripción está vacía.');
+
+        const partialResults = [];
+        const progressEl = document.getElementById('notion-progress');
+
+        for (let i = 0; i < chunks.length; i++) {
+          if (progressEl) {
+            progressEl.textContent = chunks.length > 1
+              ? `Procesando bloque ${i + 1} de ${chunks.length}…`
+              : 'Procesando respuesta del modelo…';
+          }
+          if (chunks.length > 1) {
+            setStatus('loading', `Analizando bloque ${i + 1}/${chunks.length}…`);
+          }
+
+          const userMessage = `${options.isLanguageFocus
+            ? 'Enfoque adicional: CLASE DE IDIOMAS. Aplica las 5 secciones obligatorias.\n\n'
+            : ''}Contexto del audio: ${options.contexto.join(', ')}
+Enfoque principal: ${options.enfoque.join(', ')}
+
+${chunks.length > 1
+  ? `(Este es el bloque ${i + 1} de ${chunks.length}. Genera notas SOLO de este bloque.)\n\n`
+  : ''}TRANSCRIPCIÓN CRUDA:
 """
-${text}
+${chunks[i]}
 """
 
-Genera las notas AHORA en JSON estricto.`;
+Genera las notas AHORA en JSON estricto según el esquema indicado.`;
 
-        const rawResponse = await callGemini(systemPrompt, userMessage, 180000, { responseFormat: 'json' });
+          const payload = {
+            model: currentModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userMessage }
+            ],
+            temperature: 0.2,
+            max_tokens: 4096,
+            response_format: { type: 'json_object' }
+          };
 
-        const jsonNotes = tryParseNotesJson(rawResponse);
-        let markdownNotes, docTitle;
+          const rawResponse = await callGroqChat(payload);
+          const jsonNotes = tryParseNotesJson(rawResponse);
 
-        if (jsonNotes) {
-          markdownNotes = jsonNotesToMarkdown(jsonNotes);
-          docTitle = jsonNotes.titulo_principal || 'Apuntes de la sesión';
-        } else {
-          markdownNotes = rawResponse.trim()
-            .replace(/^```(?:markdown|md)?\s*\n?/i, '')
-            .replace(/\n?```\s*$/i, '')
-            .trim();
-          const titleMatch = markdownNotes.match(/^#\s+(.+)$/m)
-            || markdownNotes.match(/^###\s+[^\n]+/m);
-          docTitle = titleMatch
-            ? (titleMatch[1] || titleMatch[0]).replace(/[*_`#]/g, '').trim()
-            : 'Apuntes de la sesión';
+          if (jsonNotes) partialResults.push(jsonNotes);
+          else console.warn(`[analyzeText] Bloque ${i + 1} no devolvió JSON válido.`);
+
+          if (i < chunks.length - 1) await delay(2000);
         }
+
+        if (partialResults.length === 0) {
+          throw new Error('El modelo no devolvió notas válidas en ningún bloque.');
+        }
+
+        const mergedNotes = mergeJsonNotes(partialResults);
+        const markdownNotes = jsonNotesToMarkdown(mergedNotes);
+        const docTitle = mergedNotes.titulo_principal || 'Apuntes de la sesión';
 
         renderNotionNotes(markdownNotes, notesContainer, docTitle);
 
-        setStatus('active', '✨ Notas generadas con Gemini');
-        showToast('✅ Notas listas');
+        setStatus('active', '✨ Notas generadas con Groq');
+        showToast(`✅ Notas listas (${chunks.length} bloque${chunks.length > 1 ? 's' : ''})`);
         document.querySelector('[data-tab="notas"]')?.click();
 
       } catch (err) {
@@ -2289,7 +2136,8 @@ Genera las notas AHORA en JSON estricto.`;
         `--- APUNTES DEL ${formatFecha(n.fecha)} (${n.title || 'Sin título'}) ---\n\n${n.markdown || ''}`
       ).join('\n\n');
 
-      openModal(`🧠 Resumen Global — ${project.nombre}`, 'Generando resumen con Gemini…');
+      openModal(`🧠 Resumen Global — ${project.nombre}`, 'Generando resumen con Groq…');
+      const model = memoriaTemporal.obtener(LS_KEY_MODEL) || 'llama-3.3-70b-versatile';
 
       const systemPrompt = `Eres un asistente experto. Recibirás varias notas Markdown de distintas sesiones de un mismo proyecto. Genera un "Resumen Global" en Markdown bien estructurado.
 REGLAS:
@@ -2301,10 +2149,73 @@ REGLAS:
       const modalContent = document.getElementById('modal-content');
 
       try {
-        const userContent = `Estas son las notas del proyecto "${project.nombre}":\n\n${combined}`;
-        const rawMd = await callGemini(systemPrompt, userContent, 180000);
+        const chunks = splitIntoWordChunks(combined, WORDS_PER_CHUNK);
+        console.log(`[globalSummary] ${chunks.length} chunk(s)`);
 
-        const md = rawMd.trim()
+        const partialSummaries = [];
+
+        for (let i = 0; i < chunks.length; i++) {
+          if (modalContent) {
+            modalContent.textContent = chunks.length > 1
+              ? `Generando resumen global… bloque ${i + 1} de ${chunks.length}`
+              : 'Generando resumen global con Groq…';
+          }
+
+          const userMessage = chunks.length > 1
+            ? `(Este es el bloque ${i + 1} de ${chunks.length}. Resume SOLO este bloque.)\n\n${chunks[i]}`
+            : chunks[i];
+
+          const payload = {
+            model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userMessage }
+            ],
+            temperature: 0.3,
+            max_tokens: 2048
+          };
+
+          const result = await callGroqChat(payload);
+          if (result && result.trim()) partialSummaries.push(result.trim());
+
+          if (i < chunks.length - 1) await delay(2000);
+        }
+
+        if (partialSummaries.length === 0) throw new Error('No se generó ningún resumen.');
+
+        let finalMd = '';
+
+        if (partialSummaries.length === 1) {
+          finalMd = partialSummaries[0];
+        } else {
+          if (modalContent) modalContent.textContent = 'Fusionando resúmenes parciales…';
+
+          const fusionPrompt = `Recibirás varios resúmenes parciales de un mismo proyecto. Fusíonálos en UN ÚNICO resumen global coherente, sin repetir información.
+REGLAS:
+- Usa H1 para el título, H2 para secciones, H3 para subtemas.
+- Incluye: Resumen, Temas recurrentes, Decisiones clave, Elementos de acción (con "- [ ] tarea").
+- No inventes información.
+- Devuelve ÚNICAMENTE Markdown, sin explicaciones.`;
+
+          const fusionPayload = {
+            model,
+            messages: [
+              { role: 'system', content: fusionPrompt },
+              {
+                role: 'user',
+                content: partialSummaries
+                  .map((s, i) => `--- RESUMEN PARCIAL ${i + 1} ---\n\n${s}`)
+                  .join('\n\n')
+              }
+            ],
+            temperature: 0.3,
+            max_tokens: 4096
+          };
+
+          finalMd = await callGroqChat(fusionPayload);
+        }
+
+        const md = finalMd.trim()
           .replace(/^```(?:markdown|md)?\s*\n?/i, '')
           .replace(/\n?```\s*$/i, '')
           .trim();
