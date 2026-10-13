@@ -36,7 +36,6 @@
       --safe-bottom: env(safe-area-inset-bottom, 0px);
     }
 
-    /* 🔧 FIX SCROLL — quitado height:100% de body, añadido overflow-y:auto */
     html { height: 100%; }
     body {
       overscroll-behavior: none;
@@ -879,7 +878,6 @@
     }
     #toast.show { transform: translateX(-50%) translateY(0); }
 
-    /* 🔧 FIX FILE INPUT — removido pointer-events:none (bloqueaba .click() en WebView) */
     #file-input, #import-file {
       position: absolute;
       left: -9999px;
@@ -1240,7 +1238,7 @@
     const LS_KEY_MODE = 'meetingmind_analysis_mode';
     const LS_KEY_CHECKBOX = 'meetingmind_notion_checkboxes';
 
-    // ═══════════ Categorías (idiomas ahora es sub-opción de académico) ═══════════
+    // ═══════════ Categorías ═══════════
     const PROMPT_CATEGORIES = {
       academico: {
         label: 'Académico',
@@ -1288,6 +1286,66 @@
         ]
       }
     };
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🔥 CHUNKING — Constante y helpers para dividir texto
+    // ═══════════════════════════════════════════════════════════════
+    const WORDS_PER_CHUNK = 1200;
+
+    function splitIntoWordChunks(text, wordsPerChunk = WORDS_PER_CHUNK) {
+      const clean = String(text || '').trim();
+      if (!clean) return [];
+
+      const words = clean.split(/\s+/).filter(Boolean);
+      if (words.length <= wordsPerChunk) return [clean];
+
+      const chunks = [];
+      for (let i = 0; i < words.length; i += wordsPerChunk) {
+        chunks.push(words.slice(i, i + wordsPerChunk).join(' '));
+      }
+      return chunks;
+    }
+
+    function mergeJsonNotes(jsonNotesArray) {
+      if (!Array.isArray(jsonNotesArray) || jsonNotesArray.length === 0) return null;
+      if (jsonNotesArray.length === 1) return jsonNotesArray[0];
+
+      const merged = {
+        titulo_principal: jsonNotesArray[0]?.titulo_principal || 'Apuntes de la sesión',
+        secciones: []
+      };
+
+      const sectionMap = new Map();
+
+      for (const notes of jsonNotesArray) {
+        if (!notes || !Array.isArray(notes.secciones)) continue;
+
+        for (const sec of notes.secciones) {
+          const title = sec.titulo_seccion || 'Sección';
+          const key = title.toLowerCase().trim();
+
+          if (!sectionMap.has(key)) {
+            sectionMap.set(key, {
+              titulo_seccion: title,
+              tipo_contenido: sec.tipo_contenido || 'lista',
+              contenido: []
+            });
+          }
+
+          const target = sectionMap.get(key);
+          const items = Array.isArray(sec.contenido) ? sec.contenido : [];
+          for (const it of items) {
+            const s = String(it).trim();
+            if (s && !target.contenido.includes(s)) {
+              target.contenido.push(s);
+            }
+          }
+        }
+      }
+
+      merged.secciones = Array.from(sectionMap.values());
+      return merged;
+    }
 
     function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -1350,6 +1408,7 @@
       txt.textContent = text;
     }
 
+    // ═══════════ fetchAvailableModels (con filtro safeguard/llava) ═══════════
     let cachedAvailableModels = null;
     async function fetchAvailableModels(forceRefresh = false) {
       if (cachedAvailableModels && !forceRefresh) return cachedAvailableModels;
@@ -1358,30 +1417,60 @@
           method: 'GET',
           headers: { 'Authorization': `Bearer ${GROQ_KEYS[0]}` }
         }, 20000);
+
         if (!response.ok) {
-          cachedAvailableModels = ['llama-3.3-70b-versatile'];
+          cachedAvailableModels = ['llama-3.1-70b-versatile', 'llama3-8b-8192'];
           return cachedAvailableModels;
         }
+
         const data = await response.json();
         const ids = (data.data || []).map(m => m.id);
-        const valid = ids.filter(id =>
-          !id.toLowerCase().includes('whisper') &&
-          !id.toLowerCase().includes('prompt-guard')
-        );
-        const preferred = valid.filter(id =>
-          id.includes('llama') || id.includes('mixtral') ||
-          id.includes('gemma') || id.includes('gpt-oss')
-        );
-        cachedAvailableModels = preferred.length > 0
-          ? preferred.slice(0, 3)
-          : valid.slice(0, 3);
-        if (!cachedAvailableModels.length) {
-          cachedAvailableModels = ['llama-3.3-70b-versatile'];
+
+        // 🔥 FIX — Excluir modelos que NO sirven para texto puro
+        const valid = ids.filter(id => {
+          const low = id.toLowerCase();
+          return !low.includes('whisper') &&
+                 !low.includes('prompt-guard') &&
+                 !low.includes('safeguard') &&
+                 !low.includes('llava') &&
+                 !low.includes('vision') &&
+                 !low.includes('tts') &&
+                 !low.includes('embed') &&
+                 !low.includes('guard');
+        });
+
+        const prioridad = [
+          'llama-3.1-70b-versatile',
+          'llama3-8b-8192',
+          'llama-3.3-70b-versatile',
+          'llama-3.1-8b-instant'
+        ];
+
+        const preferred = [];
+        for (const p of prioridad) {
+          if (valid.includes(p) && !preferred.includes(p)) preferred.push(p);
         }
+
+        for (const id of valid) {
+          if (preferred.length >= 4) break;
+          const low = id.toLowerCase();
+          if (!preferred.includes(id) &&
+              (low.includes('llama') || low.includes('mixtral') ||
+               low.includes('gemma') || low.includes('gpt-oss'))) {
+            preferred.push(id);
+          }
+        }
+
+        cachedAvailableModels = preferred.length > 0
+          ? preferred
+          : ['llama-3.1-70b-versatile', 'llama3-8b-8192'];
+
+        console.log('[fetchAvailableModels] Modelos válidos:', cachedAvailableModels);
         return cachedAvailableModels;
+
       } catch (err) {
         console.error('Error obteniendo modelos:', err);
-        cachedAvailableModels = ['llama-3.3-70b-versatile'];
+        cachedAvailableModels = ['llama-3.1-70b-versatile', 'llama3-8b-8192'];
         return cachedAvailableModels;
       }
     }
@@ -1464,8 +1553,8 @@
           if (saved && models.includes(saved)) modelSelect.value = saved;
           else { modelSelect.value = models[0]; memoriaTemporal.guardar(LS_KEY_MODEL, models[0]); }
         } else {
-          modelSelect.innerHTML = `<option value="llama-3.3-70b-versatile">🧠 llama-3.3-70b-versatile</option>`;
-          memoriaTemporal.guardar(LS_KEY_MODEL, 'llama-3.3-70b-versatile');
+          modelSelect.innerHTML = `<option value="llama-3.1-70b-versatile">🧠 llama-3.1-70b-versatile</option>`;
+          memoriaTemporal.guardar(LS_KEY_MODEL, 'llama-3.1-70b-versatile');
         }
       });
       modelSelect.addEventListener('change', () => {
@@ -2229,7 +2318,6 @@ REGLAS UNIVERSALES (obligatorias en TODOS los modos)
    • PROHIBIDO usar markdown dentro de los strings (** ## - \`).
    • Tildes, ñ y símbolos matemáticos (², ³, √, π, ∫) son bienvenidos.`;
 
-      // ── MODO ACADÉMICO + IDIOMAS ──
       if (mode === 'academico' && isLanguageFocus === true) {
         return `${REGLAS_COMUNES}
 
@@ -2244,18 +2332,18 @@ ROL ESPECÍFICO: Actúas como TUTOR Y PROFESOR DE IDIOMAS EXPERTO. Dominas gram�
 REGLAS ESPECIALES DE ESTE MODO:
 
 A) CORRECCIÓN AUTOMÁTICA DE LA TRANSCRIPCIÓN:
-   • El Whisper de la app puede haber escrito palabras mal (por acento, ruido, o mala dicción). CORRÍGELAS a su forma correcta en el idioma que se enseña.
+   • El Whisper de la app puede haber escrito palabras mal. CORRÍGELAS a su forma correcta en el idioma que se enseña.
    • Ejemplos:
      – Transcripción: "gouing tu de jardin" → Correcto: "going to the garden".
      – Transcripción: "cómo se dice arbol en inglés" → Correcto: "árbol" (tilde en español).
 
 B) ANÁLISIS DE ERRORES DEL ALUMNO:
-   • Si el alumno pronunció o dijo algo mal y el profesor lo corrigió en el audio, regístralo en la sección de correcciones.
+   • Si el alumno pronunció o dijo algo mal y el profesor lo corrigió, regístralo.
    • Formato: "Dijiste: X → Correcto: Y (explicación breve)."
 
 C) FIDELIDAD AL IDIOMA DE TRABAJO:
-   • Identifica el idioma que se enseña y mantenlo consistente en vocabulario y ejemplos.
-   • Si se mezclan idiomas en el audio, separa claramente: "Español: X / English: Y".
+   • Identifica el idioma que se enseña y mantenlo consistente.
+   • Si se mezclan idiomas, separa: "Español: X / English: Y".
 
 D) ESTRUCTURA OBLIGATORIA — usa EXACTAMENTE estas 5 secciones (en este orden):
 
@@ -2340,7 +2428,7 @@ REGLAS ESPECIALES:
       return `${REGLAS_COMUNES}\n\n${reglasEspecificas}`;
     }
 
-    // ═══════════════════ JSON → Markdown (para el renderer existente) ═══════════════════
+    // ═══════════════════ JSON → Markdown ═══════════════════
     function jsonNotesToMarkdown(obj) {
       if (!obj || typeof obj !== 'object') return '';
 
@@ -2390,7 +2478,6 @@ REGLAS ESPECIALES:
       return lines.join('\n').trim();
     }
 
-    // Intenta parsear la respuesta del modelo como JSON. Si falla, devuelve null.
     function tryParseNotesJson(rawText) {
       if (!rawText || typeof rawText !== 'string') return null;
 
@@ -2405,7 +2492,6 @@ REGLAS ESPECIALES:
           return parsed;
         }
       } catch (e) {
-        // Intentar extraer el primer objeto JSON balanceado
         const firstBrace = cleaned.indexOf('{');
         const lastBrace = cleaned.lastIndexOf('}');
         if (firstBrace !== -1 && lastBrace > firstBrace) {
@@ -2569,7 +2655,7 @@ REGLAS ESPECIALES:
       });
     }
 
-    // ═══════════════════ ANALYZE ═══════════════════
+    // ═══════════════════ ANALYZE (con chunking) ═══════════════════
     async function analyzeText(text, notesContainer, options) {
       const systemPrompt = getSystemPromptForMode(
         options.categoria,
@@ -2585,62 +2671,82 @@ REGLAS ESPECIALES:
       `;
       setStatus('loading', 'Generando notas con IA…');
 
-      const currentModel = memoriaTemporal.obtener(LS_KEY_MODEL) || 'llama-3.3-70b-versatile';
+      const currentModel = memoriaTemporal.obtener(LS_KEY_MODEL) || 'llama-3.1-70b-versatile';
 
       try {
-        const userMessage = `${options.isLanguageFocus
-          ? 'Enfoque adicional: CLASE DE IDIOMAS. Aplica las 5 secciones obligatorias de idiomas.\n\n'
-          : ''}Contexto del audio: ${options.contexto.join(', ')}
+        const totalWords = String(text || '').trim().split(/\s+/).filter(Boolean).length;
+        const chunks = splitIntoWordChunks(text, WORDS_PER_CHUNK);
+
+        console.log(`[analyzeText] ${totalWords} palabras → ${chunks.length} chunk(s) de ${WORDS_PER_CHUNK}`);
+
+        if (chunks.length === 0) {
+          throw new Error('La transcripción está vacía.');
+        }
+
+        const partialResults = [];
+        const progressEl = document.getElementById('notion-progress');
+
+        for (let i = 0; i < chunks.length; i++) {
+          if (progressEl) {
+            progressEl.textContent = chunks.length > 1
+              ? `Procesando bloque ${i + 1} de ${chunks.length}…`
+              : 'Procesando respuesta del modelo…';
+          }
+          if (chunks.length > 1) {
+            setStatus('loading', `Analizando bloque ${i + 1}/${chunks.length}…`);
+          }
+
+          const userMessage = `${options.isLanguageFocus
+            ? 'Enfoque adicional: CLASE DE IDIOMAS. Aplica las 5 secciones obligatorias de idiomas.\n\n'
+            : ''}Contexto del audio: ${options.contexto.join(', ')}
 Enfoque principal: ${options.enfoque.join(', ')}
 
-TRANSCRIPCIÓN CRUDA:
+${chunks.length > 1
+  ? `(Este es el bloque ${i + 1} de ${chunks.length} de la transcripción completa. Genera notas SOLO de este bloque, sin mencionar los otros.)\n\n`
+  : ''}TRANSCRIPCIÓN CRUDA:
 """
-${text}
+${chunks[i]}
 """
 
 Genera las notas AHORA en JSON estricto según el esquema indicado.`;
 
-        const payload = {
-          model: currentModel,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userMessage }
-          ],
-          temperature: 0.2,
-          max_tokens: 4096,
-          response_format: { type: 'json_object' }
-        };
+          const payload = {
+            model: currentModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userMessage }
+            ],
+            temperature: 0.2,
+            max_tokens: 4096,
+            response_format: { type: 'json_object' }
+          };
 
-        const progressEl = document.getElementById('notion-progress');
-        if (progressEl) progressEl.textContent = 'Procesando respuesta del modelo…';
+          const rawResponse = await callGroqChat(payload);
+          const jsonNotes = tryParseNotesJson(rawResponse);
 
-        const rawResponse = await callGroqChat(payload);
+          if (jsonNotes) {
+            partialResults.push(jsonNotes);
+          } else {
+            console.warn(`[analyzeText] Bloque ${i + 1} no devolvió JSON válido, se omite.`);
+          }
 
-        // Intentar parsear como JSON
-        const jsonNotes = tryParseNotesJson(rawResponse);
-        let markdownNotes, docTitle;
-
-        if (jsonNotes) {
-          markdownNotes = jsonNotesToMarkdown(jsonNotes);
-          docTitle = jsonNotes.titulo_principal || 'Apuntes de la sesión';
-        } else {
-          // Fallback: el modelo devolvió markdown directo
-          console.warn('[analyze] El modelo no devolvió JSON válido. Usando fallback markdown.');
-          markdownNotes = rawResponse.trim()
-            .replace(/^```(?:markdown|md)?\s*\n?/i, '')
-            .replace(/\n?```\s*$/i, '')
-            .trim();
-          const titleMatch = markdownNotes.match(/^#\s+(.+)$/m)
-            || markdownNotes.match(/^###\s+[^\n]+/m);
-          docTitle = titleMatch
-            ? (titleMatch[1] || titleMatch[0]).replace(/[*_`#]/g, '').trim()
-            : 'Apuntes de la sesión';
+          if (i < chunks.length - 1) {
+            await delay(2000);
+          }
         }
+
+        if (partialResults.length === 0) {
+          throw new Error('El modelo no devolvió notas válidas en ningún bloque.');
+        }
+
+        const mergedNotes = mergeJsonNotes(partialResults);
+        const markdownNotes = jsonNotesToMarkdown(mergedNotes);
+        const docTitle = mergedNotes.titulo_principal || 'Apuntes de la sesión';
 
         renderNotionNotes(markdownNotes, notesContainer, docTitle);
 
         setStatus('active', '✨ Notas Notion generadas');
-        showToast('✅ Notas estilo Notion listas');
+        showToast(`✅ Notas listas (${chunks.length} bloque${chunks.length > 1 ? 's' : ''})`);
         document.querySelector('[data-tab="notas"]')?.click();
 
       } catch (err) {
@@ -2968,6 +3074,7 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
       if (btnGlobal) btnGlobal.addEventListener('click', () => generateGlobalSummary(project));
     }
 
+    // ═══════════════════ GLOBAL SUMMARY (con chunking) ═══════════════════
     async function generateGlobalSummary(project) {
       const notas = Array.isArray(project.notas) ? project.notas : [];
       if (!notas.length) { showToast('⚠️ No hay notas para resumir.'); return; }
@@ -2977,7 +3084,7 @@ Genera las notas AHORA en JSON estricto según el esquema indicado.`;
       ).join('\n\n');
 
       openModal(`🧠 Resumen Global — ${project.nombre}`, 'Generando resumen global con Groq…');
-      const model = memoriaTemporal.obtener(LS_KEY_MODEL) || 'llama-3.3-70b-versatile';
+      const model = memoriaTemporal.obtener(LS_KEY_MODEL) || 'llama-3.1-70b-versatile';
 
       const systemPrompt = `Eres un asistente experto. Recibirás varias notas Markdown de distintas sesiones de un mismo proyecto. Genera un "Resumen Global" en Markdown bien estructurado.
 REGLAS:
@@ -2986,26 +3093,95 @@ REGLAS:
 - No inventes información. Solo sintetiza lo que está en las notas.
 - Devuelve ÚNICAMENTE Markdown, sin explicaciones.`;
 
+      const modalContent = document.getElementById('modal-content');
+
       try {
-        const payload = {
-          model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: combined }
-          ],
-          temperature: 0.3,
-          max_tokens: 4096
-        };
-        const result = await callGroqChat(payload);
-        const md = result.trim()
+        const chunks = splitIntoWordChunks(combined, WORDS_PER_CHUNK);
+        console.log(`[globalSummary] ${chunks.length} chunk(s) de ${WORDS_PER_CHUNK} palabras`);
+
+        const partialSummaries = [];
+
+        for (let i = 0; i < chunks.length; i++) {
+          if (modalContent) {
+            modalContent.textContent = chunks.length > 1
+              ? `Generando resumen global… bloque ${i + 1} de ${chunks.length}`
+              : 'Generando resumen global con Groq…';
+          }
+
+          const userMessage = chunks.length > 1
+            ? `(Este es el bloque ${i + 1} de ${chunks.length} del conjunto de notas. Resume SOLO este bloque, sin mencionar los otros.)\n\n${chunks[i]}`
+            : chunks[i];
+
+          const payload = {
+            model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: userMessage }
+            ],
+            temperature: 0.3,
+            max_tokens: 2048
+          };
+
+          const result = await callGroqChat(payload);
+          if (result && result.trim()) {
+            partialSummaries.push(result.trim());
+          }
+
+          if (i < chunks.length - 1) {
+            await delay(2000);
+          }
+        }
+
+        if (partialSummaries.length === 0) {
+          throw new Error('No se generó ningún resumen.');
+        }
+
+        let finalMd = '';
+
+        if (partialSummaries.length === 1) {
+          finalMd = partialSummaries[0];
+        } else {
+          if (modalContent) modalContent.textContent = 'Fusionando resúmenes parciales…';
+
+          const fusionPrompt = `Recibirás varios resúmenes parciales de un mismo proyecto. Fusíonálos en UN ÚNICO resumen global coherente, sin repetir información.
+REGLAS:
+- Usa H1 para el título, H2 para secciones, H3 para subtemas.
+- Incluye: Resumen, Temas recurrentes, Decisiones clave, Elementos de acción (con "- [ ] tarea").
+- No inventes información.
+- Devuelve ÚNICAMENTE Markdown, sin explicaciones.`;
+
+          const fusionPayload = {
+            model,
+            messages: [
+              { role: 'system', content: fusionPrompt },
+              {
+                role: 'user',
+                content: partialSummaries
+                  .map((s, i) => `--- RESUMEN PARCIAL ${i + 1} ---\n\n${s}`)
+                  .join('\n\n')
+              }
+            ],
+            temperature: 0.3,
+            max_tokens: 4096
+          };
+
+          finalMd = await callGroqChat(fusionPayload);
+        }
+
+        const md = finalMd.trim()
           .replace(/^```(?:markdown|md)?\s*\n?/i, '')
           .replace(/\n?```\s*$/i, '')
           .trim();
+
         const html = renderMarkdownToHTML(md, 'global_' + Date.now());
         document.getElementById('modal-content').innerHTML = `<div class="notion-content">${html}</div>`;
         attachNotionCheckboxListeners(document.getElementById('modal-content'));
+
       } catch (err) {
-        document.getElementById('modal-content').textContent = `⚠️ Error: ${err.message}`;
+        console.error('Error generando resumen global:', err);
+        if (modalContent) {
+          modalContent.textContent = `⚠️ Error: ${err.message}`;
+        }
       }
     }
 
