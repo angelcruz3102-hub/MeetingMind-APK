@@ -1267,152 +1267,15 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🔥 CHUNKING DE AUDIO POR TIEMPO (Fix Error 413 de Groq ASPH)
+    // 🔥 CHUNKING DE AUDIO POR BYTES ESTABLE (Sin AudioContext)
     // ═══════════════════════════════════════════════════════════════
     async function transcribeWithGroqChunked(file, onProgress) {
-      const MAX_CHUNK_SECONDS = 600; // 10 minutos por bloque (seguro para el límite de 7200s/hora)
-
-      // Si el archivo es muy pequeño (< 2MB), intentar enviarlo directo
-      if (file.size < 2 * 1024 * 1024) {
-        if (onProgress) onProgress('Transcribiendo audio corto...');
-        return await transcribeSingleChunk(file);
-      }
-
-      if (onProgress) onProgress('Analizando duración del audio...');
-
-      // Usar AudioContext para decodificar y dividir por tiempo
-      const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      const arrayBuffer = await file.arrayBuffer();
-
-      let audioBuffer;
-      try {
-        audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      } catch (err) {
-        console.warn('No se pudo decodificar el audio para dividir por tiempo. Usando división por bytes como fallback.', err);
-        // Fallback: dividir por bytes (menos preciso pero funcional)
-        return await transcribeByBytes(file, onProgress);
-      }
-
-      const duration = audioBuffer.duration;
-      const totalChunks = Math.ceil(duration / MAX_CHUNK_SECONDS);
-
-      console.log(`[Audio] Duración total: ${duration.toFixed(1)}s → ${totalChunks} bloque(s) de ${MAX_CHUNK_SECONDS}s`);
-
-      let fullTranscript = '';
-
-      for (let i = 0; i < totalChunks; i++) {
-        if (globalTranscriptionController && globalTranscriptionController.signal.aborted) {
-          throw new Error('Cancelado por el usuario.');
-        }
-
-        const startTime = i * MAX_CHUNK_SECONDS;
-        const endTime = Math.min(startTime + MAX_CHUNK_SECONDS, duration);
-        const chunkDuration = endTime - startTime;
-
-        if (onProgress) {
-          onProgress(`Transcribiendo bloque ${i + 1} de ${totalChunks} (${Math.round(startTime)}s - ${Math.round(endTime)}s)...`);
-        }
-
-        // Crear un nuevo buffer offline para renderizar el fragmento
-        const sampleRate = audioBuffer.sampleRate;
-        const startSample = Math.floor(startTime * sampleRate);
-        const endSample = Math.min(Math.floor(endTime * sampleRate), audioBuffer.length);
-        const frameCount = endSample - startSample;
-
-        const offlineCtx = new OfflineAudioContext(
-          audioBuffer.numberOfChannels,
-          frameCount,
-          sampleRate
-        );
-
-        const newBuffer = offlineCtx.createBuffer(
-          audioBuffer.numberOfChannels,
-          frameCount,
-          sampleRate
-        );
-
-        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-          const channelData = audioBuffer.getChannelData(channel);
-          const segmentData = channelData.subarray(startSample, endSample);
-          newBuffer.copyToChannel(segmentData, channel);
-        }
-
-        const source = offlineCtx.createBufferSource();
-        source.buffer = newBuffer;
-        source.connect(offlineCtx.destination);
-        source.start();
-
-        const renderedBuffer = await offlineCtx.startRendering();
-
-        // Convertir el AudioBuffer renderizado a un Blob WAV
-        const wavBlob = audioBufferToWav(renderedBuffer);
-        const chunkFile = new File([wavBlob], `part_${i + 1}.wav`, { type: 'audio/wav' });
-
-        const transcript = await transcribeSingleChunk(chunkFile);
-        if (transcript && transcript.trim()) {
-          fullTranscript += (fullTranscript ? ' ' : '') + transcript.trim();
-        }
-
-        // 🔥 Pausa entre bloques para no saturar el límite de 7200s/hora.
-        if (i < totalChunks - 1) {
-          if (onProgress) onProgress(`Bloque ${i + 1} listo. Esperando 5s...`);
-          await delay(5000);
-        }
-      }
-
-      audioContext.close();
-      return fullTranscript;
-    }
-
-    // Helper para convertir AudioBuffer a WAV (necesario para enviar a Groq)
-    function audioBufferToWav(buffer) {
-      const numOfChan = buffer.numberOfChannels;
-      const length = buffer.length * numOfChan * 2 + 44;
-      const bufferArray = new ArrayBuffer(length);
-      const view = new DataView(bufferArray);
-      let channels = [], i, sample, offset = 0, pos = 0;
-
-      const setUint16 = (data, offset) => { view.setUint16(offset, data, true); };
-      const setUint32 = (data, offset) => { view.setUint32(offset, data, true); };
-
-      setUint32(0x46464952, 0); // "RIFF"
-      setUint32(length - 8, 4); // file length - 8
-      setUint32(0x45564157, 8); // "WAVE"
-
-      setUint32(0x20746d66, 12); // "fmt " chunk
-      setUint32(16, 16); // length = 16
-      setUint16(1, 20); // PCM (uncompressed)
-      setUint16(numOfChan, 22);
-      setUint32(buffer.sampleRate, 24);
-      setUint32(buffer.sampleRate * 2 * numOfChan, 28); // avg. bytes/sec
-      setUint16(numOfChan * 2, 32); // block-align
-      setUint16(16, 34); // 16-bit
-
-      setUint32(0x61746164, 36); // "data" - chunk
-      setUint32(length - pos - 4, 40); // chunk length
-
-      for (i = 0; i < buffer.numberOfChannels; i++) channels.push(buffer.getChannelData(i));
-
-      while (pos < length) {
-        for (i = 0; i < numOfChan; i++) {
-          if (offset < buffer.length) {
-            sample = Math.max(-1, Math.min(1, channels[i][offset])); // clamp
-            sample = (sample < 0 ? sample * 0x8000 : sample * 0x7FFF) | 0; // scale to 16-bit signed int
-            view.setInt16(pos, sample, true);
-            pos += 2;
-          }
-        }
-        offset++;
-      }
-      return new Blob([view], { type: 'audio/wav' });
-    }
-
-    // Fallback por bytes (si el navegador no soporta AudioContext)
-    async function transcribeByBytes(file, onProgress) {
-      const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB (más seguro que 10MB)
+      // 🔥 Chunks de 2MB para evitar error 413 (Request too large)
+      const CHUNK_SIZE = 2 * 1024 * 1024; 
       const total = file.size;
       const chunks = [];
       let start = 0, idx = 0;
+      
       while (start < total) {
         const end = Math.min(start + CHUNK_SIZE, total);
         chunks.push({ blob: file.slice(start, end), index: idx + 1, total: Math.ceil(total / CHUNK_SIZE) });
@@ -1425,6 +1288,7 @@
         if (globalTranscriptionController && globalTranscriptionController.signal.aborted) {
           throw new Error('Cancelado por el usuario.');
         }
+        
         const chunkMB = (chunks[i].blob.size / (1024 * 1024)).toFixed(2);
         if (onProgress) onProgress(`Transcribiendo parte ${i + 1} de ${chunks.length} (${chunkMB} MB)...`);
 
@@ -1434,14 +1298,17 @@
           { type: file.type || 'audio/webm' }
         );
 
+        // 🔥 transcribeSingleChunk ya se encarga de rotar las API Keys si una falla
         const t = await transcribeSingleChunk(partFile);
         if (t && t.trim()) full += (full ? ' ' : '') + t.trim();
 
+        // Pausa entre bloques para no saturar el límite de peticiones por minuto
         if (i < chunks.length - 1) {
-          if (onProgress) onProgress(`Parte ${i + 1} OK. Esperando 5s...`);
+          if (onProgress) onProgress(`Parte ${i + 1} OK. Esperando 5s antes de la siguiente...`);
           await delay(5000);
         }
       }
+      
       return full;
     }
 
