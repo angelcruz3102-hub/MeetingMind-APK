@@ -1267,7 +1267,7 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🔥 CHUNKING DE AUDIO POR BYTES ESTABLE (Sin AudioContext)
+    // 🔥 CHUNKING DE AUDIO POR BYTES ESTABLE (Anti-OOM y Anti-429)
     // ═══════════════════════════════════════════════════════════════
     async function transcribeWithGroqChunked(file, onProgress) {
       // 🔥 Chunks de 2MB para evitar error 413 (Request too large)
@@ -1292,37 +1292,33 @@
         const chunkMB = (chunks[i].blob.size / (1024 * 1024)).toFixed(2);
         if (onProgress) onProgress(`Transcribiendo parte ${i + 1} de ${chunks.length} (${chunkMB} MB)...`);
 
-        const partFile = new File(
-          [chunks[i].blob],
-          `part_${i + 1}.${file.name.split('.').pop() || 'webm'}`,
-          { type: file.type || 'audio/webm' }
-        );
-
         // 🔥 transcribeSingleChunk ya se encarga de rotar las API Keys si una falla
-        const t = await transcribeSingleChunk(partFile);
+        const t = await transcribeSingleChunk(chunks[i].blob, file.type, i + 1);
         if (t && t.trim()) full += (full ? ' ' : '') + t.trim();
 
-        // Pausa entre bloques para no saturar el límite de peticiones por minuto
+        // 🔥 Pausa de 15 segundos para no saturar el Rate Limit (RPM) de Groq
         if (i < chunks.length - 1) {
-          if (onProgress) onProgress(`Parte ${i + 1} OK. Esperando 5s antes de la siguiente...`);
-          await delay(5000);
+          if (onProgress) onProgress(`Parte ${i + 1} OK. Esperando 15s para no saturar Groq...`);
+          await delay(15000);
         }
       }
       
       return full;
     }
 
-    async function transcribeSingleChunk(file) {
+    async function transcribeSingleChunk(blob, fileType, partNumber) {
       let lastError = null;
       for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
         if (globalTranscriptionController && globalTranscriptionController.signal.aborted) {
           throw new Error('Cancelado por el usuario.');
         }
+        
         const apiKey = getNextGroqKey();
+        
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', blob, `part_${partNumber}.${fileType.split('/')[1] || 'mp3'}`);
         formData.append('model', 'whisper-large-v3-turbo');
-        formData.append('response_format', 'json');
+        formData.append('response_format', 'text'); // 🔥 Pedimos texto plano, no JSON (más eficiente)
         formData.append('language', 'es');
 
         try {
@@ -1331,40 +1327,45 @@
             headers: { 'Authorization': `Bearer ${apiKey}` },
             body: formData,
             externalSignal: globalTranscriptionController ? globalTranscriptionController.signal : null
-          }, 45000);
+          }, 60000); // Aumentamos a 60s el timeout
 
           if (response.ok) {
-            const data = await response.json();
-            return data.text || '';
+            // Como pedimos response_format: 'text', leemos directamente el texto
+            const text = await response.text();
+            return text || '';
           }
-          const errData = await response.json().catch(() => ({}));
-          const errMsg = errData?.error?.message || `HTTP ${response.status}`;
+          
           if (response.status === 401 || response.status === 403) {
             lastError = new Error(`API Key inválida o revocada (${response.status}).`);
             continue;
           }
           if (response.status === 429 || response.status === 413) {
-            lastError = new Error(`Límite alcanzado (${response.status}): ${errMsg}`);
-            await delay(3000);
+            lastError = new Error(`Límite alcanzado (${response.status}).`);
+            await delay(5000); // Si Groq nos bloquea, esperamos 5s y probamos la siguiente key
             continue;
           }
           if (response.status >= 500) {
-            lastError = new Error(`Error del servidor Groq (${response.status}): ${errMsg}`);
-            await delay(2000);
+            lastError = new Error(`Error del servidor Groq (${response.status}).`);
+            await delay(3000);
             continue;
           }
-          throw new Error(`HTTP ${response.status}: ${errMsg}`);
+          
+          // Si es un error 400 (audio corrupto), lo lanzamos para que el bucle principal lo capture
+          throw new Error(`Error al procesar bloque (${response.status})`);
+
         } catch (err) {
           lastError = err;
           if (err.message.includes('cancelada')) throw err;
+          
+          // Si es un error de red, esperamos y reintentamos con otra key
           if (err.message.startsWith('Error de red') || err.message.includes('timeout')) {
-            await delay(1500);
+            await delay(3000);
             continue;
           }
-          throw err;
+          throw err; // Error 400 irrecuperable
         }
       }
-      throw new Error(`Todas las ${GROQ_KEYS.length} API Keys fallaron. Último: ${lastError?.message || 'Desconocido'}`);
+      throw new Error(`Todas las API Keys fallaron en esta parte. Último: ${lastError?.message}`);
     }
 
     // ═══════════════════════════════════════════════════════════════
