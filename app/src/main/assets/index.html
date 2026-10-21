@@ -8,7 +8,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>Meeting Mind — Notion AI Style</title>
 
+  <!-- Librerías de Terceros -->
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.8/dist/purify.min.js"></script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -263,10 +265,7 @@
 
     <label for="model-select">Modelo de Notas Inteligentes (Groq)</label>
     <select id="model-select">
-      <option value="llama-3.3-70b-versatile">🧠 llama-3.3-70b-versatile (Recomendado)</option>
-      <option value="llama-3.1-70b-versatile">⚡ llama-3.1-70b-versatile</option>
-      <option value="llama3-70b-8192">💫 llama3-70b-8192</option>
-      <option value="llama3-8b-8192">🌱 llama3-8b-8192 (ligero)</option>
+      <option value="">Cargando modelos...</option>
     </select>
 
     <div class="key-divider">
@@ -291,7 +290,7 @@
                 autocorrect="off"></textarea>
       <div class="keys-btn-row">
         <button id="btn-save-keys" class="btn-secondary">💾 Guardar Keys</button>
-        <button id="btn-reset-keys" class="btn-secondary">↺ Restaurar Defaults</button>
+        <button id="btn-reset-keys" class="btn-secondary">↺ Borrar Keys</button>
       </div>
       <div id="keys-save-status"></div>
     </div>
@@ -300,7 +299,7 @@
       <label>🔬 Diagnóstico de conexión</label>
       <div style="margin-top: 10px;">
         <button id="btn-test-apis" class="btn-secondary" style="font-size: 0.8rem; padding: 9px 12px; min-height: 44px; width: 100%;">
-          🔬 Probar las <span id="keys-count-diag">2</span> Groq API Keys
+          🔬 Probar las <span id="keys-count-diag">0</span> Groq API Keys
         </button>
         <div id="diag-result" style="display:none;"></div>
       </div>
@@ -408,10 +407,8 @@
     // ═══════════════════════════════════════════════════════════════
     // 🎙️ GROQ — Keys y endpoints
     // ═══════════════════════════════════════════════════════════════
-    const GROQ_KEYS_DEFAULT = [
-      "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",
-      "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"
-    ];
+    // C2: Eliminadas las keys por defecto por seguridad.
+    const GROQ_KEYS_DEFAULT = []; 
 
     const LS_KEY_GROQ_KEYS = 'meetingmind_groq_keys';
     const LS_KEY_MODEL = 'meetingmind_groq_text_model';
@@ -421,6 +418,10 @@
     const GROQ_AUDIO_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
     const GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions';
     const GROQ_MODELS_URL = 'https://api.groq.com/openai/v1/models';
+
+    const keyCooldown = new Map();
+    let globalTranscriptionController = null;
+    let nativeStopTimer;
 
     function isValidGroqKey(k) {
       return typeof k === 'string' && k.trim().startsWith('gsk_') && k.trim().length > 20;
@@ -439,20 +440,26 @@
 
     let GROQ_KEYS = loadGroqKeys();
     let groqKeyIndex = 0;
+
     function getNextGroqKey() {
-      const key = GROQ_KEYS[groqKeyIndex];
-      groqKeyIndex = (groqKeyIndex + 1) % GROQ_KEYS.length;
-      return key;
+      if (GROQ_KEYS.length === 0) return null;
+      const now = Date.now();
+      for (let i = 0; i < GROQ_KEYS.length; i++) {
+        const k = GROQ_KEYS[groqKeyIndex];
+        groqKeyIndex = (groqKeyIndex + 1) % GROQ_KEYS.length;
+        if ((keyCooldown.get(k) || 0) <= now) return k;
+      }
+      return GROQ_KEYS[groqKeyIndex]; // all in cooldown, return next anyway
     }
 
     function saveGroqKeys(keysArray) {
       const cleaned = keysArray.map(k => (typeof k === 'string' ? k.trim() : '')).filter(isValidGroqKey);
-      if (cleaned.length === 0) return { ok: false, error: 'No hay keys válidas.' };
       try {
         localStorage.setItem(LS_KEY_GROQ_KEYS, JSON.stringify(cleaned));
         GROQ_KEYS = cleaned;
         groqKeyIndex = 0;
         cachedAvailableModels = null;
+        keyCooldown.clear();
         return { ok: true, count: cleaned.length };
       } catch (e) {
         return { ok: false, error: e.message };
@@ -461,9 +468,10 @@
 
     function resetGroqKeys() {
       try { localStorage.removeItem(LS_KEY_GROQ_KEYS); } catch (e) {}
-      GROQ_KEYS = [...GROQ_KEYS_DEFAULT];
+      GROQ_KEYS = [];
       groqKeyIndex = 0;
       cachedAvailableModels = null;
+      keyCooldown.clear();
     }
 
     function updateKeysCountUI() {
@@ -502,7 +510,7 @@
     };
 
     // ═══════════════════════════════════════════════════════════════
-    // 🔥 CHUNKING DE TEXTO — Anti TPM
+    // 🔥 CHUNKING DE TEXTO
     // ═══════════════════════════════════════════════════════════════
     const WORDS_PER_CHUNK = 1200;
 
@@ -554,36 +562,26 @@
 
     function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-    let globalTranscriptionController = null;
-
-    async function fetchWithTimeout(url, options = {}, timeoutMs = 30000) {
+    // A5: fetchWithTimeout con parse interno
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 30000, parse = null) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-      const extSignal = options.externalSignal;
-      if (extSignal) {
-        if (extSignal.aborted) {
-          clearTimeout(timeoutId);
-          throw new Error('Operación cancelada por el usuario.');
-        }
-        extSignal.addEventListener('abort', () => controller.abort(), { once: true });
+      const ext = options.externalSignal;
+      const onAbort = () => controller.abort();
+      if (ext) { 
+        if (ext.aborted) { clearTimeout(timeoutId); throw new Error('Operación cancelada por el usuario.'); }
+        ext.addEventListener('abort', onAbort, { once: true }); 
       }
-
       try {
-        return await fetch(url, {
-          ...options,
-          signal: controller.signal,
-          mode: 'cors',
-          credentials: 'omit'
-        });
+        const res = await fetch(url, { ...options, signal: controller.signal, mode: 'cors', credentials: 'omit' });
+        if (parse && res.ok) res.parsed = await res[parse]();
+        return res;
       } catch (err) {
-        if (err.name === 'AbortError') {
-          if (extSignal && extSignal.aborted) throw new Error('Operación cancelada por el usuario.');
-          throw new Error('La petición excedió el tiempo límite (timeout).');
-        }
+        if (err.name === 'AbortError') throw new Error(ext?.aborted ? 'Operación cancelada por el usuario.' : 'La petición excedió el tiempo límite (timeout).');
         throw new Error(`Error de red: ${err.message || 'Error desconocido'}`);
       } finally {
         clearTimeout(timeoutId);
+        ext?.removeEventListener('abort', onAbort);
       }
     }
 
@@ -613,20 +611,26 @@
       txt.textContent = text;
     }
 
+    // C3: Modelos actualizados y fallbacks
     let cachedAvailableModels = null;
     async function fetchAvailableModels(forceRefresh = false) {
       if (cachedAvailableModels && !forceRefresh) return cachedAvailableModels;
+      if (GROQ_KEYS.length === 0) {
+        return ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.6-27b'];
+      }
       try {
         const response = await fetchWithTimeout(GROQ_MODELS_URL, {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${GROQ_KEYS[0]}` }
-        }, 20000);
+        }, 20000, 'json');
         if (!response.ok) {
-          cachedAvailableModels = ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile'];
+          cachedAvailableModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.6-27b'];
           return cachedAvailableModels;
         }
-        const data = await response.json();
+        const data = response.parsed;
         const ids = (data.data || []).map(m => m.id);
+        
+        // Filtro de modelos válidos (incluyendo qwen)
         const valid = ids.filter(id => {
           const low = id.toLowerCase();
           return !low.includes('whisper') &&
@@ -638,41 +642,43 @@
                  !low.includes('embed') &&
                  !low.includes('guard');
         });
-        const prioridad = [
-          'llama-3.3-70b-versatile',
-          'llama-3.1-70b-versatile',
-          'llama3-70b-8192',
-          'llama3-8b-8192'
-        ];
+
         const preferred = [];
+        const prioridad = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.6-27b', 'llama-3.3-70b-versatile'];
+        
         for (const p of prioridad) {
           if (valid.includes(p) && !preferred.includes(p)) preferred.push(p);
         }
         for (const id of valid) {
-          if (preferred.length >= 4) break;
+          if (preferred.length >= 5) break;
           const low = id.toLowerCase();
           if (!preferred.includes(id) &&
-              (low.includes('llama') || low.includes('mixtral') ||
-               low.includes('gemma') || low.includes('gpt-oss'))) {
+              (low.includes('qwen') || low.includes('llama') || low.includes('mixtral') || low.includes('gemma'))) {
             preferred.push(id);
           }
         }
-        cachedAvailableModels = preferred.length > 0
-          ? preferred
-          : ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile'];
+        
+        cachedAvailableModels = preferred.length > 0 ? preferred : ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'];
         console.log('[fetchAvailableModels] Modelos válidos:', cachedAvailableModels);
         return cachedAvailableModels;
       } catch (err) {
         console.error('Error obteniendo modelos:', err);
-        cachedAvailableModels = ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile'];
+        cachedAvailableModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.6-27b'];
         return cachedAvailableModels;
       }
     }
 
+    // A7: LocalStorage a prueba de cuota
     const memoriaTemporal = {
       datos: {},
-      guardar(c, v) { try { localStorage.setItem(c, v); } catch (e) { this.datos[c] = v; } },
-      obtener(c) { try { return localStorage.getItem(c); } catch (e) { return this.datos[c] || null; } }
+      guardar(c, v) { 
+        try { localStorage.setItem(c, v); delete this.datos[c]; return true; }
+        catch (e) { this.datos[c] = v; return false; }
+      },
+      obtener(c) { 
+        if (c in this.datos) return this.datos[c];
+        try { return localStorage.getItem(c); } catch (e) { return null; } 
+      }
     };
 
     let currentNotionMarkdown = '';
@@ -683,6 +689,7 @@
     let micStream = null;
     let currentRecorder = null;
     let isRecordingActive = false;
+    let isStarting = false;
     let recordingChunkInterval = null;
 
     let modeSelectState = { mode: null, pendingAction: null };
@@ -709,6 +716,23 @@
         if (wakeLock) { await wakeLock.release(); wakeLock = null; }
       } catch (err) {}
       if (notice) notice.classList.remove('show');
+    }
+
+    // A8: Funciones de portapapeles y descargas adaptadas a WebView
+    async function copyText(t) {
+      try { if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(t); return true; } } catch (_) {}
+      const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      let ok = false; try { ok = document.execCommand('copy'); } catch (_) {}
+      ta.remove(); return ok;
+    }
+
+    function saveTextFile(name, mime, text) {
+      if (window.AndroidNative?.saveFile) return window.AndroidNative.saveFile(name, mime, text);
+      const url = URL.createObjectURL(new Blob([text], { type: mime }));
+      const a = Object.assign(document.createElement('a'), { href: url, download: name });
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -769,13 +793,13 @@
       });
 
       document.getElementById('btn-reset-keys').addEventListener('click', () => {
-        if (!confirm('¿Restaurar las Groq API keys de fábrica?')) return;
+        if (!confirm('¿Borrar todas las Groq API keys?')) return;
         resetGroqKeys();
-        keysInput.value = GROQ_KEYS.join('\n');
-        keysStatus.textContent = '↺ Keys restauradas.';
+        keysInput.value = '';
+        keysStatus.textContent = '↺ Keys borradas.';
         keysStatus.style.color = 'var(--muted)';
         updateKeysCountUI();
-        showToast('↺ Keys restauradas');
+        showToast('↺ Keys borradas');
       });
 
       btnConfig.addEventListener('click', () => configPanel.classList.toggle('open'));
@@ -828,12 +852,12 @@
         }
       });
 
-      document.getElementById('btn-copy-transcript').addEventListener('click', () => {
+      document.getElementById('btn-copy-transcript').addEventListener('click', async () => {
         const text = transcriptBox.value.trim();
         if (!text) { showToast('⚠️ No hay texto para copiar'); return; }
-        navigator.clipboard.writeText(text)
-          .then(() => showToast('✅ Transcripción copiada'))
-          .catch(() => showToast('⚠️ Error al copiar'));
+        const ok = await copyText(text);
+        if (ok) showToast('✅ Transcripción copiada');
+        else showToast('⚠️ Error al copiar');
       });
 
       btnAnalyzePasted.addEventListener('click', async () => {
@@ -867,13 +891,8 @@
 
       document.getElementById('btn-export-data').addEventListener('click', () => {
         const data = memoriaTemporal.obtener(LS_KEY_PROJECTS) || '[]';
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `MeetingMind_Backup_${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
+        const date = new Date().toISOString().split('T')[0];
+        saveTextFile(`MeetingMind_Backup_${date}.json`, 'application/json', data);
         showToast('✅ Copia descargada.');
       });
 
@@ -887,6 +906,7 @@
           try {
             const parsed = JSON.parse(ev.target.result);
             if (!Array.isArray(parsed)) throw new Error('Formato inválido');
+            if (!confirm('¿Sobrescribir todos los proyectos actuales con los del archivo?')) return;
             memoriaTemporal.guardar(LS_KEY_PROJECTS, JSON.stringify(parsed));
             showToast('✅ Datos importados.');
             renderProjectsTab();
@@ -905,21 +925,25 @@
           resultEl.style.display = 'block';
           resultEl.className = 'diag-result';
           resultEl.textContent = `🔬 Probando las ${GROQ_KEYS.length} Groq API Keys...\n\n`;
+          if (GROQ_KEYS.length === 0) {
+             resultEl.textContent = '⚠️ No hay API Keys configuradas. Pega una arriba.';
+             resultEl.className = 'diag-result fail';
+             return;
+          }
           let okCount = 0;
           const lines = [];
           for (let i = 0; i < GROQ_KEYS.length; i++) {
             const key = GROQ_KEYS[i];
-            const preview = key.slice(0, 12) + '…' + key.slice(-4);
+            const preview = '...' + key.slice(-4);
             lines.push(`[${i + 1}/${GROQ_KEYS.length}] Probando ${preview}...`);
             resultEl.textContent = lines.join('\n');
             try {
               const res = await fetchWithTimeout(GROQ_MODELS_URL, {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${key}` }
-              }, 15000);
+              }, 15000, 'json');
               if (res.ok) {
-                const data = await res.json();
-                const count = (data.data || []).length;
+                const count = (res.parsed.data || []).length;
                 lines[lines.length - 1] = `✅ [${i + 1}/${GROQ_KEYS.length}] ${preview} → OK (${count} modelos)`;
                 okCount++;
               } else if (res.status === 401 || res.status === 403) {
@@ -995,7 +1019,12 @@
     // 🎙️ GRABACIÓN
     // ═══════════════════════════════════════════════════════════════
     async function startRecordingProcess() {
-      if (isRecordingActive) return;
+      if (isRecordingActive || isStarting) return;
+      if (GROQ_KEYS.length === 0) {
+        showToast('⚠️ Configura al menos una API Key de Groq antes de grabar.', 5000);
+        return;
+      }
+      isStarting = true;
       await requestWakeLock();
 
       if (window.AndroidNative && typeof window.AndroidNative.startRecording === 'function') {
@@ -1013,6 +1042,8 @@
           resetRecordButton();
           enableAllButtons();
           releaseWakeLock();
+        } finally {
+          isStarting = false;
         }
         return;
       }
@@ -1035,20 +1066,38 @@
         resetRecordButton();
         enableAllButtons();
         releaseWakeLock();
+      } finally {
+        isStarting = false;
       }
     }
 
     function startMediaRecorderChunk() {
       if (!isRecordingActive || !micStream) return;
-      currentRecorder = new MediaRecorder(micStream, { mimeType: 'audio/webm', audioBitsPerSecond: 16000 });
+      let mime = 'audio/webm;codecs=opus';
+      if (!MediaRecorder.isTypeSupported(mime)) mime = 'audio/webm';
+      
+      currentRecorder = new MediaRecorder(micStream, { mimeType: mime, audioBitsPerSecond: 32000 });
       const chunks = [];
       currentRecorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
+      
       currentRecorder.onstop = async () => {
-        if (!chunks.length) return;
-        const blob = new Blob(chunks, { type: 'audio/webm' });
-        const file = new File([blob], `record_${Date.now()}.webm`, { type: 'audio/webm' });
-        await transcribeRecordedChunk(file);
+        try {
+          if (!chunks.length) return;
+          const blob = new Blob(chunks, { type: mime });
+          chunks.length = 0;
+          await transcribeRecordedChunk(new File([blob], `record_${Date.now()}.webm`, { type: mime }));
+          if (!isRecordingActive) await maybeAutoAnalyze();
+        } catch (err) {
+          showToast('❌ ' + err.message);
+          setStatus('error', 'Error al transcribir');
+        } finally {
+          if (!isRecordingActive) {
+            resetRecordButton();
+            enableAllButtons();
+          }
+        }
       };
+      
       currentRecorder.start();
       recordingChunkInterval = setTimeout(() => {
         if (isRecordingActive && currentRecorder && currentRecorder.state !== 'inactive') {
@@ -1066,6 +1115,7 @@
       if (window.AndroidNative && typeof window.AndroidNative.stopRecording === 'function') {
         setStatus('loading', 'Procesando grabación nativa…');
         window.AndroidNative.stopRecording();
+        nativeStopTimer = setTimeout(() => window.receiveNativeError('El servicio nativo no respondió.'), 60000);
         return;
       }
 
@@ -1084,7 +1134,29 @@
       }
     }
 
+    // C1: Cola secuencial
+    let transcribeQueue = Promise.resolve();
+
+    function transcribeRecordedChunk(file) {
+      const run = transcribeQueue.then(() => _transcribeRecordedChunkImpl(file));
+      transcribeQueue = run.catch(() => {});
+      return run;
+    }
+
+    async function _transcribeRecordedChunkImpl(file) {
+      setStatus('loading', 'Transcribiendo bloque de audio…');
+      setTranscriptProgressHTML(
+        '<div class="transcript-progress"><span class="spinner"></span><span>Transcribiendo bloque de audio…</span></div>');
+      try {
+        const text = await transcribeFile(file, msg => setStatus('loading', msg));
+        if (text && text.trim()) appendToTranscript(text);
+      } finally {
+        clearTranscriptProgress();
+      }
+    }
+
     window.receiveNativeAudio = async function (base64Audio) {
+      clearTimeout(nativeStopTimer);
       try {
         if (!base64Audio || typeof base64Audio !== 'string' || base64Audio.length < 10) {
           throw new Error('Audio nativo vacío o inválido.');
@@ -1098,7 +1170,9 @@
         const file = new File([blob], `record_native_${Date.now()}.m4a`, { type: 'audio/mp4' });
         resetRecordButton();
         setStatus('loading', 'Transcribiendo grabación nativa…');
+        
         await transcribeRecordedChunk(file);
+        await maybeAutoAnalyze();
       } catch (err) {
         console.error('[receiveNativeAudio]', err);
         const msg = (err && err.message) ? err.message : '';
@@ -1135,6 +1209,7 @@
     };
 
     window.receiveNativeError = function (message) {
+      clearTimeout(nativeStopTimer);
       showToast('❌ ' + (message || 'Error en grabación nativa'));
       isRecordingActive = false;
       resetRecordButton();
@@ -1144,7 +1219,7 @@
     };
 
     // ═══════════════════════════════════════════════════════════════
-    // ✍️ TRANSCRIPCIÓN
+    // ✍️ TRANSCRIPCIÓN Y CHUNKING
     // ═══════════════════════════════════════════════════════════════
     function appendToTranscript(text) {
       const box = document.getElementById('transcript-box');
@@ -1160,55 +1235,6 @@
     }
 
     function clearTranscriptProgress() { setTranscriptProgressHTML(''); }
-
-    async function transcribeRecordedChunk(file) {
-      const id = 'temp_' + Date.now();
-      setTranscriptProgressHTML(
-        `<div class="transcript-progress" id="${id}"><span class="spinner"></span><span class="progress-text">Transcribiendo bloque de audio...</span></div>`
-      );
-      try {
-        async function transcribeWithGroqChunked(file, onProgress) {
-  const MAX_GROQ_SIZE = 25 * 1024 * 1024; // 25 MB (límite de Groq)
-
-  // ✅ SI EL ARCHIVO ES MENOR A 25 MB, SE ENVÍA COMPLETO (Evita corrupción)
-  if (file.size <= MAX_GROQ_SIZE) {
-    if (onProgress) onProgress('Transcribiendo audio completo...');
-    return await transcribeSingleChunk(file, file.type, 1);
-  }
-
-  // 🔪 SI ES MAYOR A 25 MB, SE DIVIDE POR BYTES (Con chunks más grandes)
-  const CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB por bloque (más seguro que 2 MB)
-  const total = file.size;
-  const chunks = [];
-  let start = 0, idx = 0;
-  
-  while (start < total) {
-    const end = Math.min(start + CHUNK_SIZE, total);
-    chunks.push({ blob: file.slice(start, end), index: idx + 1, total: Math.ceil(total / CHUNK_SIZE) });
-    start = end;
-    idx++;
-  }
-
-  let full = '';
-  for (let i = 0; i < chunks.length; i++) {
-    if (globalTranscriptionController && globalTranscriptionController.signal.aborted) {
-      throw new Error('Cancelado por el usuario.');
-    }
-    
-    const chunkMB = (chunks[i].blob.size / (1024 * 1024)).toFixed(2);
-    if (onProgress) onProgress(`Transcribiendo parte ${i + 1} de ${chunks.length} (${chunkMB} MB)...`);
-
-    const t = await transcribeSingleChunk(chunks[i].blob, file.type, i + 1);
-    if (t && t.trim()) full += (full ? ' ' : '') + t.trim();
-
-    if (i < chunks.length - 1) {
-      if (onProgress) onProgress(`Parte ${i + 1} OK. Esperando 5s...`);
-      await delay(5000);
-    }
-  }
-  
-  return full;
-}
 
     async function handleMultipleAudioFiles(files) {
       disableAllButtons();
@@ -1226,115 +1252,142 @@
         showToast('⏹️ Cancelando...');
       });
 
-      for (let i = 0; i < files.length; i++) {
-        if (signal.aborted) break;
-        const file = files[i];
-        const fileMB = (file.size / (1024 * 1024)).toFixed(2);
-        setStatus('loading', `Procesando audio ${i + 1}/${files.length} (${fileMB} MB)...`);
+      let transcribedOk = 0;
+      try {
+        for (let i = 0; i < files.length; i++) {
+          if (signal.aborted) break;
+          const file = files[i];
+          const fileMB = (file.size / (1024 * 1024)).toFixed(2);
+          setStatus('loading', `Procesando audio ${i + 1}/${files.length} (${fileMB} MB)...`);
 
-        const progressEl = document.createElement('div');
-        progressEl.className = 'transcript-progress';
-        progressEl.innerHTML = `<span class="spinner"></span><span class="progress-text">Preparando audio ${i + 1}/${files.length}...</span>`;
-        progressArea.appendChild(progressEl);
-        if (!progressArea.contains(cancelBtn)) progressArea.appendChild(cancelBtn);
+          const progressEl = document.createElement('div');
+          progressEl.className = 'transcript-progress';
+          progressEl.innerHTML = `<span class="spinner"></span><span class="progress-text">Preparando audio ${i + 1}/${files.length}...</span>`;
+          progressArea.appendChild(progressEl);
+          if (!progressArea.contains(cancelBtn)) progressArea.appendChild(cancelBtn);
 
-        const startTime = Date.now();
-        const timerInt = setInterval(() => {
-          const secs = Math.floor((Date.now() - startTime) / 1000);
-          const textEl = progressEl.querySelector('.progress-text');
-          if (textEl) {
-            const base = textEl.dataset.base || textEl.textContent;
-            textEl.dataset.base = base;
-            textEl.textContent = `${base} [${secs}s]`;
-          }
-        }, 1000);
-
-        try {
-          const transcript = await transcribeWithGroqChunked(file, (msg) => {
+          const startTime = Date.now();
+          const timerInt = setInterval(() => {
+            const secs = Math.floor((Date.now() - startTime) / 1000);
             const textEl = progressEl.querySelector('.progress-text');
-            if (textEl) { textEl.textContent = msg; textEl.dataset.base = msg; }
-            setStatus('loading', `${msg} (Audio ${i + 1}/${files.length})`);
-          });
-          if (transcript && transcript.trim()) {
-            appendToTranscript(transcript.trim());
-            showToast(`✅ Audio ${i + 1} completado.`);
-          } else {
-            const emptyEl = document.createElement('div');
-            emptyEl.className = 'transcript-error';
-            emptyEl.innerHTML = `<span class="err-title">⚠️ Audio ${i + 1} sin texto detectable</span>El archivo puede estar silencioso o corrupto.`;
-            progressArea.appendChild(emptyEl);
+            if (textEl) {
+              const base = textEl.dataset.base || textEl.textContent;
+              textEl.dataset.base = base;
+              textEl.textContent = `${base} [${secs}s]`;
+            }
+          }, 1000);
+
+          try {
+            const transcript = await transcribeFile(file, (msg) => {
+              const textEl = progressEl.querySelector('.progress-text');
+              if (textEl) { textEl.textContent = msg; textEl.dataset.base = msg; }
+              setStatus('loading', `${msg} (Audio ${i + 1}/${files.length})`);
+            });
+            if (transcript && transcript.trim()) {
+              appendToTranscript(transcript.trim());
+              transcribedOk++;
+              showToast(`✅ Audio ${i + 1} completado.`);
+            } else {
+              const emptyEl = document.createElement('div');
+              emptyEl.className = 'transcript-error';
+              emptyEl.innerHTML = `<span class="err-title">⚠️ Audio ${i + 1} sin texto detectable</span>El archivo puede estar silencioso o corrupto.`;
+              progressArea.appendChild(emptyEl);
+            }
+          } catch (err) {
+            const errDiv = document.createElement('div');
+            errDiv.className = 'transcript-error';
+            const isCancel = err.message.includes('Cancelado');
+            errDiv.innerHTML = `<span class="err-title">${isCancel ? '⏹️ Cancelado' : '❌ Error al procesar "' + escHtml(file.name) + '"'}</span>${escHtml(err.message)}`;
+            progressArea.appendChild(errDiv);
+            if (isCancel) { showToast('⏹️ Transcripción cancelada.'); break; }
+            else showToast(`❌ Fallo: ${err.message.slice(0, 80)}`);
+          } finally {
+            clearInterval(timerInt);
+            progressEl.remove();
           }
-        } catch (err) {
-          const errDiv = document.createElement('div');
-          errDiv.className = 'transcript-error';
-          const isCancel = err.message.includes('Cancelado');
-          errDiv.innerHTML = `<span class="err-title">${isCancel ? '⏹️ Cancelado' : '❌ Error al procesar "' + escHtml(file.name) + '"'}</span>${escHtml(err.message)}`;
-          progressArea.appendChild(errDiv);
-          if (isCancel) { showToast('⏹️ Transcripción cancelada.'); break; }
-          else showToast(`❌ Fallo: ${err.message.slice(0, 80)}`);
-        } finally {
-          clearInterval(timerInt);
-          progressEl.remove();
         }
+      } finally {
+        cancelBtn.remove();
+        globalTranscriptionController = null;
+        if (transcribedOk > 0 && !signal.aborted) await maybeAutoAnalyze();
+        else if (!signal.aborted) setStatus('error', 'No se pudo extraer texto del audio.');
+        enableAllButtons();
       }
-
-      cancelBtn.remove();
-      globalTranscriptionController = null;
-
-      const hasContent = document.getElementById('transcript-box').value.trim().length > 0;
-      if (hasContent && !signal.aborted) await maybeAutoAnalyze();
-      else setStatus('error', 'No se pudo extraer texto del audio.');
-      enableAllButtons();
     }
 
-    async function transcribeWithGroqChunked(file, onProgress) {
-      const CHUNK_SIZE = 2 * 1024 * 1024; 
-      const total = file.size;
-      const chunks = [];
-      let start = 0, idx = 0;
-      
-      while (start < total) {
-        const end = Math.min(start + CHUNK_SIZE, total);
-        chunks.push({ blob: file.slice(start, end), index: idx + 1, total: Math.ceil(total / CHUNK_SIZE) });
-        start = end;
-        idx++;
-      }
+    // C4: Transcripción directa vs por tiempo
+    const MAX_DIRECT_BYTES = 24 * 1024 * 1024;
+    
+    function extFromFile(f) {
+      const OK_EXT = ['flac','mp3','mp4','mpeg','mpga','m4a','ogg','wav','webm'];
+      const n = (f.name || '').split('.').pop().toLowerCase();
+      if (OK_EXT.includes(n)) return n;
+      const t = (f.type || '').split('/')[1]?.split(';')[0].replace('x-', '');
+      return OK_EXT.includes(t) ? t : 'm4a';
+    }
 
+    async function transcribeFile(file, onProgress) {
+      if (file.size <= MAX_DIRECT_BYTES) return transcribeSingleChunk(file, 1);
+      if (file.size > 150 * 1024 * 1024) throw new Error('Archivo demasiado grande para este dispositivo. Divídelo antes de subirlo.');
+      
+      const ctx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+      let buf;
+      try { buf = await ctx.decodeAudioData(await file.arrayBuffer()); }
+      finally { ctx.close(); }
+      
+      const step = 300 * buf.sampleRate; // 5 min ≈ 9.6 MB en WAV mono 16-bit
+      const total = Math.ceil(buf.length / step);
       let full = '';
-      for (let i = 0; i < chunks.length; i++) {
-        if (globalTranscriptionController && globalTranscriptionController.signal.aborted) {
-          throw new Error('Cancelado por el usuario.');
-        }
-        
-        const chunkMB = (chunks[i].blob.size / (1024 * 1024)).toFixed(2);
-        if (onProgress) onProgress(`Transcribiendo parte ${i + 1} de ${chunks.length} (${chunkMB} MB)...`);
-
-        const t = await transcribeSingleChunk(chunks[i].blob, file.type, i + 1);
-        if (t && t.trim()) full += (full ? ' ' : '') + t.trim();
-
-        if (i < chunks.length - 1) {
-          if (onProgress) onProgress(`Parte ${i + 1} OK. Esperando 15s para no saturar Groq...`);
-          await delay(15000);
-        }
-      }
       
+      for (let i = 0; i < total; i++) {
+        if (globalTranscriptionController?.signal.aborted) throw new Error('Cancelado por el usuario.');
+        onProgress?.(`Transcribiendo parte ${i + 1} de ${total}…`);
+        const s = i * step, e = Math.min(s + step, buf.length), mono = new Float32Array(e - s);
+        for (let c = 0; c < buf.numberOfChannels; c++) {
+          const d = buf.getChannelData(c);
+          for (let k = 0; k < mono.length; k++) mono[k] += d[s + k] / buf.numberOfChannels;
+        }
+        const t = await transcribeSingleChunk(floatToWavBlob(mono, buf.sampleRate), i + 1);
+        if (t?.trim()) full += (full ? ' ' : '') + t.trim();
+        if (i < total - 1) await delay(3000);
+      }
       return full;
     }
 
-    async function transcribeSingleChunk(blob, fileType, partNumber) {
+    function floatToWavBlob(f32, sr) {
+      const b = new ArrayBuffer(44 + f32.length * 2), v = new DataView(b);
+      const w = (o, s) => { for (let i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+      w(0, 'RIFF'); v.setUint32(4, 36 + f32.length * 2, true); w(8, 'WAVEfmt ');
+      v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+      v.setUint32(24, sr, true); v.setUint32(28, sr * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true);
+      w(36, 'data'); v.setUint32(40, f32.length * 2, true);
+      for (let i = 0, o = 44; i < f32.length; i++, o += 2) {
+        const x = Math.max(-1, Math.min(1, f32[i]));
+        v.setInt16(o, x < 0 ? x * 0x8000 : x * 0x7FFF, true);
+      }
+      return new Blob([b], { type: 'audio/wav' });
+    }
+
+    async function transcribeSingleChunk(blob, partNumber) {
       let lastError = null;
-      for (let attempt = 0; attempt < GROQ_KEYS.length; attempt++) {
+      const maxAttempts = 5; // Aumentado para tolerar fallos de red
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
         if (globalTranscriptionController && globalTranscriptionController.signal.aborted) {
           throw new Error('Cancelado por el usuario.');
         }
         
         const apiKey = getNextGroqKey();
+        if (!apiKey) throw new Error('No hay API Keys configuradas.');
         
         const formData = new FormData();
-        formData.append('file', blob, `part_${partNumber}.${fileType.split('/')[1] || 'mp3'}`);
+        const ext = blob.name ? extFromFile(blob) : (blob.type === 'audio/wav' ? 'wav' : 'mp3');
+        formData.append('file', blob, `part_${partNumber}.${ext}`);
         formData.append('model', 'whisper-large-v3-turbo');
         formData.append('response_format', 'text');
-        formData.append('language', 'es');
+        // A2: Auto-detección en modo idiomas
+        if (currentSessionMode !== 'idiomas') formData.append('language', 'es');
+
+        const uploadTimeout = Math.max(60000, (blob.size / 50000) * 1000); // A5: Timeout proporcional
 
         try {
           const response = await fetchWithTimeout(GROQ_AUDIO_URL, {
@@ -1342,21 +1395,30 @@
             headers: { 'Authorization': `Bearer ${apiKey}` },
             body: formData,
             externalSignal: globalTranscriptionController ? globalTranscriptionController.signal : null
-          }, 60000);
+          }, uploadTimeout);
 
           if (response.ok) {
-            const text = await response.text();
-            return text || '';
+            return await response.text() || '';
           }
           
           if (response.status === 401 || response.status === 403) {
+            keyCooldown.set(apiKey, Date.now() + 3600e3);
             lastError = new Error(`API Key inválida o revocada (${response.status}).`);
             continue;
           }
-          if (response.status === 429 || response.status === 413) {
-            lastError = new Error(`Límite alcanzado (${response.status}).`);
-            await delay(5000);
+          if (response.status === 429) {
+            const ra = parseFloat(response.headers.get('retry-after')) || 5;
+            keyCooldown.set(apiKey, Date.now() + ra * 1000);
+            lastError = new Error(`Límite alcanzado (429).`);
+            await delay(ra * 1000);
             continue;
+          }
+          if (response.status === 413) {
+            throw new Error(`Archivo demasiado grande para Groq (413).`);
+          }
+          if (response.status === 400) {
+            const txt = await response.text().catch(() => '');
+            throw new Error(`Audio rechazado por Groq (400). ${txt.slice(0, 50)}...`);
           }
           if (response.status >= 500) {
             lastError = new Error(`Error del servidor Groq (${response.status}).`);
@@ -1364,12 +1426,12 @@
             continue;
           }
           
-          throw new Error(`Error al procesar bloque (${response.status})`);
+          throw new Error(`Error HTTP ${response.status}`);
 
         } catch (err) {
           lastError = err;
           if (err.message.includes('cancelada')) throw err;
-          
+          if (err.message.includes('413') || err.message.includes('400')) throw err; // No reintentar errores de formato
           if (err.message.startsWith('Error de red') || err.message.includes('timeout')) {
             await delay(3000);
             continue;
@@ -1377,11 +1439,11 @@
           throw err; 
         }
       }
-      throw new Error(`Todas las API Keys fallaron en esta parte. Último: ${lastError?.message}`);
+      throw new Error(`Fallaron los intentos. Último: ${lastError?.message}`);
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🎯 AUTO-ANÁLISIS
+    // 🎯 AUTO-ANÁLISIS Y PROMPTS
     // ═══════════════════════════════════════════════════════════════
     async function maybeAutoAnalyze() {
       const text = document.getElementById('transcript-box').value.trim();
@@ -1426,102 +1488,99 @@
       };
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 🎓 SYSTEM PROMPTS — VERSIÓN OPTIMIZADA ALINEADA AL JSON
-    // ═══════════════════════════════════════════════════════════════
     function getSystemPromptForMode(mode, isLanguageFocus) {
       const REGLAS_COMUNES = `Eres el motor de procesamiento de texto de "Meeting Mind". Tu único propósito es limpiar, estructurar y resumir transcripciones de audio en crudo, priorizando la precisión absoluta y la concisión extrema.
 
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    REGLAS UNIVERSALES INQUEBRANTABLES
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REGLAS UNIVERSALES INQUEBRANTABLES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-    1) CORRECCIÓN SILENCIOSA DE TRANSCRIPCIÓN:
-       • Si el texto contiene ruidos, palabras inaudibles o errores de captura de audio, infiere la palabra correcta basándote en el contexto general. Sustituye la palabra de forma invisible.
-       • Tienes ESTRICTAMENTE PROHIBIDO agregar notas aclaratorias, explicar qué palabra fue modificada, o usar frases como "(el audio decía...)".
+1) CORRECCIÓN SILENCIOSA DE TRANSCRIPCIÓN:
+   • Si el texto contiene ruidos, palabras inaudibles o errores de captura de audio, infiere la palabra correcta basándote en el contexto general. Sustituye la palabra de forma invisible.
+   • Tienes ESTRICTAMENTE PROHIBIDO agregar notas aclaratorias, explicar qué palabra fue modificada, o usar frases como "(el audio decía...)".
 
-    2) CORRECCIÓN FACTUAL SIN EXPANSIÓN:
-       • Si identificas un error técnico o de datos en lo que dijo el hablante, aplica la corrección técnica directamente en los apuntes.
-       • No agregues teoría, no des justificaciones, ni incluyas contexto de respaldo para explicar tu corrección.
+2) CORRECCIÓN FACTUAL SIN EXPANSIÓN:
+   • Si identificas un error técnico o de datos en lo que dijo el hablante, aplica la corrección técnica directamente en los apuntes.
+   • No agregues teoría, no des justificaciones, ni incluyas contexto de respaldo para explicar tu corrección.
 
-    3) CERO ALUCINACIÓN (ROL ESTRICTO):
-       • Actúa exclusivamente como un transcriptor y estructurador. Tienes prohibido asumir el rol de analista, consultor o experto.
-       • No inventes consejos, recomendaciones, inferencias lógicas, análisis de causas ni siguientes pasos a menos que el hablante los haya dictado explícitamente.
+3) CERO ALUCINACIÓN (ROL ESTRICTO):
+   • Actúa exclusivamente como un transcriptor y estructurador. Tienes prohibido asumir el rol de analista, consultor o experto.
+   • No inventes consejos, recomendaciones, inferencias lógicas, análisis de causas ni siguientes pasos a menos que el hablante los haya dictado explícitamente.
 
-    4) CONCISIÓN IMPLACABLE (LÍMITE DE VOLUMEN):
-       • Tu objetivo es sintetizar. El volumen de palabras de tu respuesta debe ser SIEMPRE menor al volumen de la transcripción original.
-       • Elimina introducciones, frases de transición y conclusiones prefabricadas. Ve directo a los datos.
+4) CONCISIÓN IMPLACABLE (LÍMITE DE VOLUMEN):
+   • Tu objetivo es sintetizar. El volumen de palabras de tu respuesta debe ser SIEMPRE menor al volumen de la transcripción original.
+   • Elimina introducciones, frases de transición y conclusiones prefabricadas. Ve directo a los datos.
 
-    5) ESTRUCTURA DINÁMICA:
-       • Si el texto original carece de información para justificar una sección, OMITE esa sección por completo. NUNCA generes contenido para rellenar un espacio en blanco.
+5) ESTRUCTURA DINÁMICA:
+   • Si el texto original carece de información para justificar una sección, OMITE esa sección por completo. NUNCA generes contenido para rellenar un espacio en blanco.
 
-    6) FORMATO DE SALIDA — JSON ESTRICTO:
-       Devuelve EXCLUSIVAMENTE un objeto JSON válido:
+6) FORMATO DE SALIDA — JSON ESTRICTO:
+   Devuelve EXCLUSIVAMENTE un objeto JSON válido:
 
+   {
+     "titulo_principal": "Título descriptivo y conciso",
+     "secciones": [
        {
-         "titulo_principal": "Título descriptivo y conciso",
-         "secciones": [
-           {
-             "titulo_seccion": "Título exacto de la sección",
-             "tipo_contenido": "lista" | "parrafos",
-             "contenido": ["elemento 1", "elemento 2"]
-           }
-         ]
+         "titulo_seccion": "Título exacto de la sección",
+         "tipo_contenido": "lista" | "parrafos",
+         "contenido": ["elemento 1", "elemento 2"]
        }
+     ]
+   }
 
-       REGLAS DEL JSON:
-       • SOLO el JSON. Nada de texto antes ni después.
-       • "tipo_contenido": exactamente "lista" o "parrafos".
-       • "contenido": siempre array de strings.
-       • Escapa comillas internas (\\") y saltos de línea (\\n).
-       • PROHIBIDO usar markdown dentro de los strings (nada de **, ##, -).`;
+   REGLAS DEL JSON:
+   • SOLO el JSON. Nada de texto antes ni después.
+   • "tipo_contenido": exactamente "lista" o "parrafos".
+   • "contenido": siempre array de strings.
+   • Escapa comillas internas (\\") y saltos de línea (\\n).
+   • PROHIBIDO usar markdown dentro de los strings (nada de **, ##, -).`;
 
       const ACADEMICO_PROMPT = `
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    MODO ACTIVO: ACADÉMICO — Apuntes Universitarios
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    PERFIL DEL USUARIO: Estudiante universitario repasando para un examen.
-    Utiliza estas secciones para tu JSON (omite las que no tengan datos):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODO ACTIVO: ACADÉMICO — Apuntes Universitarios
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+PERFIL DEL USUARIO: Estudiante universitario repasando para un examen.
+Utiliza estas secciones para tu JSON (omite las que no tengan datos):
 
-    - "📌 Tema Central" | tipo_contenido: "parrafos" | (Describir directamente de qué trata)
-    - "🧠 Conceptos y Definiciones" | tipo_contenido: "lista" | (Formato: "Concepto: definición")
-    - "🧮 Fórmulas y Datos Clave" | tipo_contenido: "lista" | (Formato: "Dato: valor con unidades")
-    - "📝 Desarrollo Explicativo" | tipo_contenido: "parrafos" | (Explicación de subtemas)
-    - "✅ Tareas y Asignaciones" | tipo_contenido: "lista" | (Tareas concretas mencionadas)`;
+- "📌 Tema Central" | tipo_contenido: "parrafos" | (Describir directamente de qué trata)
+- "🧠 Conceptos y Definiciones" | tipo_contenido: "lista" | (Formato: "Concepto: definición")
+- "🧮 Fórmulas y Datos Clave" | tipo_contenido: "lista" | (Formato: "Dato: valor con unidades")
+- "📝 Desarrollo Explicativo" | tipo_contenido: "parrafos" | (Explicación de subtemas)
+- "✅ Tareas y Asignaciones" | tipo_contenido: "lista" | (Tareas concretas mencionadas)`;
 
       const EJECUTIVO_PROMPT = `
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    MODO ACTIVO: EJECUTIVO — Reunión de Negocio / Trabajo
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    Utiliza estas secciones para tu JSON (omite las que no tengan datos):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODO ACTIVO: EJECUTIVO — Reunión de Negocio / Trabajo
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Utiliza estas secciones para tu JSON (omite las que no tengan datos):
 
-    - "📝 Resumen Ejecutivo" | tipo_contenido: "parrafos"
-    - "💡 Puntos Clave" | tipo_contenido: "lista"
-    - "🎯 Decisiones y Acuerdos" | tipo_contenido: "lista"
-    - "✅ Elementos de Acción" | tipo_contenido: "lista" | (Formato: "Tarea — Responsable — Fecha")
-    - "📊 Métricas y Cifras" | tipo_contenido: "lista"`;
+- "📝 Resumen Ejecutivo" | tipo_contenido: "parrafos"
+- "💡 Puntos Clave" | tipo_contenido: "lista"
+- "🎯 Decisiones y Acuerdos" | tipo_contenido: "lista"
+- "✅ Elementos de Acción" | tipo_contenido: "lista" | (Formato: "Tarea — Responsable — Fecha")
+- "📊 Métricas y Cifras" | tipo_contenido: "lista"`;
 
       const LIBRE_PROMPT = `
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    MODO ACTIVO: LIBRE — Reflexión / Podcast / Conversación
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    Utiliza estas secciones para tu JSON (omite las que no tengan datos):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODO ACTIVO: LIBRE — Reflexión / Podcast / Conversación
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Utiliza estas secciones para tu JSON (omite las que no tengan datos):
 
-    - "📝 Resumen General" | tipo_contenido: "parrafos"
-    - "💡 Ideas Principales" | tipo_contenido: "lista"
-    - "💭 Citas Destacadas" | tipo_contenido: "lista"
-    - "📌 Notas y Matices" | tipo_contenido: "lista"`;
+- "📝 Resumen General" | tipo_contenido: "parrafos"
+- "💡 Ideas Principales" | tipo_contenido: "lista"
+- "💭 Citas Destacadas" | tipo_contenido: "lista"
+- "📌 Notas y Matices" | tipo_contenido: "lista"`;
 
       const IDIOMAS_PROMPT = `
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    MODO ACTIVO: ACADÉMICO con ENFOQUE EN CLASE DE IDIOMAS
-    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-    Utiliza estas secciones para tu JSON (omite las que no tengan datos):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+MODO ACTIVO: ACADÉMICO con ENFOQUE EN CLASE DE IDIOMAS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Utiliza estas secciones para tu JSON (omite las que no tengan datos):
 
-    - "Explicación Didáctica del Profesor" | tipo_contenido: "parrafos"
-    - "Vocabulario y Expresiones Clave" | tipo_contenido: "lista"
-    - "Reglas Gramaticales y Estructuras" | tipo_contenido: "lista"
-    - "Corrección de Errores y Tips de Pronunciación" | tipo_contenido: "lista"`;
+- "Explicación Didáctica del Profesor" | tipo_contenido: "parrafos"
+- "Vocabulario y Expresiones Clave" | tipo_contenido: "lista"
+- "Reglas Gramaticales y Estructuras" | tipo_contenido: "lista"
+- "Corrección de Errores y Tips de Pronunciación" | tipo_contenido: "lista"`;
 
       let reglasEspecificas;
       if (mode === 'academico' && isLanguageFocus === true) {
@@ -1539,9 +1598,6 @@
       return `${REGLAS_COMUNES}\n\n${reglasEspecificas}\n\n[RECORDATORIO FINAL E INQUEBRANTABLE: DEVUELVE EXCLUSIVAMENTE CÓDIGO JSON VÁLIDO. CERO TEXTO DE INTRODUCCIÓN O CONCLUSIÓN ANTES O DESPUÉS DEL JSON.]`;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 🤖 GROQ CHAT
-    // ═══════════════════════════════════════════════════════════════
     async function callGroqChat(payload) {
       const dynamicModels = await fetchAvailableModels();
       const modelsToTry = [...new Set([payload.model, ...dynamicModels])].filter(Boolean);
@@ -1556,6 +1612,8 @@
           if (attemptCount >= maxAttempts) break;
           attemptCount++;
           const apiKey = getNextGroqKey();
+          if (!apiKey) throw new Error('No hay API Keys configuradas.');
+
           try {
             const response = await fetchWithTimeout(GROQ_CHAT_URL, {
               method: 'POST',
@@ -1573,17 +1631,26 @@
               throw new Error('Respuesta vacía del modelo');
             }
 
+            if (response.status === 401 || response.status === 403) {
+              keyCooldown.set(apiKey, Date.now() + 3600e3);
+              lastError = new Error(`[Auth] ${response.status}`);
+              continue;
+            }
+
+            if (response.status === 429) {
+              const ra = parseFloat(response.headers.get('retry-after')) || 5;
+              keyCooldown.set(apiKey, Date.now() + ra * 1000);
+              lastError = new Error(`[Rate Limit]`);
+              await delay(ra * 1000);
+              continue;
+            }
+
             let errMsg = `HTTP ${response.status}`;
             try {
               const errData = await response.json();
               errMsg = errData?.error?.message || errMsg;
             } catch (_) {}
 
-            if (response.status === 429) {
-              lastError = new Error(`[Rate Limit] ${errMsg}`);
-              await delay(2000 * (ka + 1));
-              continue;
-            }
             lastError = new Error(errMsg);
             break;
           } catch (err) {
@@ -1599,9 +1666,6 @@
       throw new Error(`Todos los modelos y claves fallaron. Último: ${lastError?.message || 'Desconocido'}`);
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 📝 JSON → MARKDOWN
-    // ═══════════════════════════════════════════════════════════════
     function jsonNotesToMarkdown(obj) {
       if (!obj || typeof obj !== 'object') return '';
       const lines = [];
@@ -1670,9 +1734,6 @@
       return null;
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 📋 CHECKBOX + MARKDOWN RENDER
-    // ═══════════════════════════════════════════════════════════════
     function getCheckboxState() {
       try { return JSON.parse(localStorage.getItem(LS_KEY_CHECKBOX) || '{}'); }
       catch (e) { return {}; }
@@ -1694,7 +1755,8 @@
       let html = '';
       if (typeof marked !== 'undefined' && marked.parse) {
         try {
-          marked.setOptions({ gfm: true, breaks: true, headerIds: false, mangle: false });
+          // B5: Eliminadas opciones obsoletas (headerIds, mangle)
+          marked.setOptions({ gfm: true, breaks: true });
           html = marked.parse(clean);
         } catch (e) {
           html = fallbackMarkdownRenderer(clean);
@@ -1702,6 +1764,12 @@
       } else {
         html = fallbackMarkdownRenderer(clean);
       }
+      
+      // A1: Sanitizar HTML contra XSS
+      if (typeof DOMPurify !== 'undefined') {
+        html = DOMPurify.sanitize(html, { ADD_ATTR: ['checked'] });
+      }
+      
       return postProcessCheckboxes(html, noteKey);
     }
 
@@ -1803,9 +1871,6 @@
       });
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // ✨ ANÁLISIS CON GROQ
-    // ═══════════════════════════════════════════════════════════════
     async function analyzeText(text, notesContainer, options) {
       const systemPrompt = getSystemPromptForMode(
         options.categoria,
@@ -1821,7 +1886,7 @@
       `;
       setStatus('loading', 'Generando notas con Groq…');
 
-      const currentModel = memoriaTemporal.obtener(LS_KEY_MODEL) || 'llama-3.3-70b-versatile';
+      const currentModel = memoriaTemporal.obtener(LS_KEY_MODEL) || (await fetchAvailableModels())[0] || 'openai/gpt-oss-120b';
 
       try {
         const totalWords = String(text || '').trim().split(/\s+/).filter(Boolean).length;
@@ -1832,6 +1897,7 @@
         if (chunks.length === 0) throw new Error('La transcripción está vacía.');
 
         const partialResults = [];
+        const failedChunks = [];
         const progressEl = document.getElementById('notion-progress');
 
         for (let i = 0; i < chunks.length; i++) {
@@ -1845,18 +1911,18 @@
           }
 
           const userMessage = `${options.isLanguageFocus
-            ? 'Enfoque adicional: CLASE DE IDIOMAS. Aplica las 5 secciones obligatorias.\n\n'
+            ? 'Enfoque adicional: CLASE DE IDIOMAS.\n\n'
             : ''}Contexto del audio: ${options.contexto.join(', ')}
 Enfoque principal: ${options.enfoque.join(', ')}
 
 ${chunks.length > 1
-  ? `(Este es el bloque ${i + 1} de ${chunks.length}. Genera las secciones obligatorias SOLO con la información de este fragmento. NO uses muletillas, NO introduzcas el fragmento.)\n\n`
+  ? `(Este es el bloque ${i + 1} de ${chunks.length}. Genera las secciones definidas para este modo SOLO con la información de este fragmento. NO uses muletillas, NO introduzcas el fragmento.)\n\n`
   : ''}TRANSCRIPCIÓN CRUDA:
 """
 ${chunks[i]}
 """
 
-Genera las notas AHORA en JSON estricto con las secciones obligatorias y sin muletillas.`;
+Genera las notas AHORA en JSON estricto.`;
 
           const payload = {
             model: currentModel,
@@ -1869,11 +1935,17 @@ Genera las notas AHORA en JSON estricto con las secciones obligatorias y sin mul
             response_format: { type: 'json_object' }
           };
 
-          const rawResponse = await callGroqChat(payload);
-          const jsonNotes = tryParseNotesJson(rawResponse);
+          let jsonNotes = null;
+          for (let t = 0; t < 2 && !jsonNotes; t++) {
+            try {
+               jsonNotes = tryParseNotesJson(await callGroqChat(payload));
+            } catch(e) {
+               console.warn(`[analyzeText] Fallo intento ${t+1} bloque ${i+1}`, e);
+            }
+          }
 
           if (jsonNotes) partialResults.push(jsonNotes);
-          else console.warn(`[analyzeText] Bloque ${i + 1} no devolvió JSON válido.`);
+          else failedChunks.push(i + 1);
 
           if (i < chunks.length - 1) await delay(2000);
         }
@@ -1889,7 +1961,11 @@ Genera las notas AHORA en JSON estricto con las secciones obligatorias y sin mul
         renderNotionNotes(markdownNotes, notesContainer, docTitle);
 
         setStatus('active', '✨ Notas generadas con Groq');
-        showToast(`✅ Notas listas (${chunks.length} bloque${chunks.length > 1 ? 's' : ''})`);
+        
+        let toastMsg = `✅ ${partialResults.length}/${chunks.length} bloques listos`;
+        if (failedChunks.length > 0) toastMsg += ` ⚠️ fallaron: ${failedChunks.join(', ')}`;
+        showToast(toastMsg, 5000);
+        
         document.querySelector('[data-tab="notas"]')?.click();
 
       } catch (err) {
@@ -1937,20 +2013,15 @@ Genera las notas AHORA en JSON estricto con las secciones obligatorias y sin mul
 
       attachNotionCheckboxListeners(document.getElementById('notion-render-target'));
 
-      document.getElementById('btn-copy-notion').addEventListener('click', () => {
-        navigator.clipboard.writeText(currentNotionMarkdown)
-          .then(() => showToast('✅ Markdown copiado'))
-          .catch(() => showToast('⚠️ Error al copiar'));
+      document.getElementById('btn-copy-notion').addEventListener('click', async () => {
+        const ok = await copyText(currentNotionMarkdown);
+        if (ok) showToast('✅ Markdown copiado');
+        else showToast('⚠️ Error al copiar');
       });
 
       document.getElementById('btn-download-md').addEventListener('click', () => {
-        const blob = new Blob([currentNotionMarkdown], { type: 'text/markdown;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${(docTitle || 'apuntes').replace(/[^\w\s\-áéíóúñ]/gi, '').slice(0, 60)}.md`;
-        a.click();
-        URL.revokeObjectURL(url);
+        const fileName = `${(docTitle || 'apuntes').replace(/[^\w\s\-áéíóúñ]/gi, '').slice(0, 60)}.md`;
+        saveTextFile(fileName, 'text/markdown;charset=utf-8', currentNotionMarkdown);
         showToast('⬇️ Archivo .md descargado');
       });
 
@@ -1984,13 +2055,13 @@ Genera las notas AHORA en JSON estricto con las secciones obligatorias y sin mul
     }
 
     function disableButtonsExcept(activeBtn) {
-      ['btn-start-record', 'btn-upload', 'btn-analyze-pasted'].forEach(id => {
+      ['btn-start-record', 'btn-upload', 'btn-analyze-pasted', 'btn-clear-transcript', 'btn-clear'].forEach(id => {
         const b = document.getElementById(id);
         if (b && b !== activeBtn) b.disabled = true;
       });
     }
     function disableAllButtons() {
-      ['btn-start-record', 'btn-upload', 'btn-analyze-pasted'].forEach(id => {
+      ['btn-start-record', 'btn-upload', 'btn-analyze-pasted', 'btn-clear-transcript', 'btn-clear'].forEach(id => {
         const b = document.getElementById(id);
         if (b) b.disabled = true;
       });
@@ -1999,20 +2070,28 @@ Genera las notas AHORA en JSON estricto con las secciones obligatorias y sin mul
       const btnStart = document.getElementById('btn-start-record');
       const btnUpload = document.getElementById('btn-upload');
       const btnAnalyze = document.getElementById('btn-analyze-pasted');
+      const btnClearT = document.getElementById('btn-clear-transcript');
+      const btnClearS = document.getElementById('btn-clear');
+
       if (btnStart) btnStart.disabled = false;
       if (btnUpload) btnUpload.disabled = false;
       if (btnAnalyze) btnAnalyze.disabled = false;
-
-      const btnClear = document.getElementById('btn-clear');
-      if (btnClear) {
+      if (btnClearT) btnClearT.disabled = false;
+      
+      if (btnClearS) {
         const hasContent = document.getElementById('transcript-box').value.trim().length > 0;
-        btnClear.style.display = hasContent ? 'block' : 'none';
+        btnClearS.style.display = hasContent ? 'block' : 'none';
+        btnClearS.disabled = false;
       }
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 📁 PROYECTOS
-    // ═══════════════════════════════════════════════════════════════
+    // Red de seguridad para promesas rechazadas
+    window.addEventListener('unhandledrejection', e => {
+      console.error(e.reason);
+      showToast('❌ ' + (e.reason?.message || 'Error inesperado'));
+      if (!isRecordingActive) enableAllButtons();
+    });
+
     function getProjects() {
       try {
         const raw = memoriaTemporal.obtener(LS_KEY_PROJECTS);
@@ -2020,7 +2099,12 @@ Genera las notas AHORA en JSON estricto con las secciones obligatorias y sin mul
         return Array.isArray(p) ? p : [];
       } catch (e) { return []; }
     }
-    function saveProjects(p) { memoriaTemporal.guardar(LS_KEY_PROJECTS, JSON.stringify(p)); }
+    
+    function saveProjects(p) {
+      const ok = memoriaTemporal.guardar(LS_KEY_PROJECTS, JSON.stringify(p));
+      if (!ok) showToast('⚠️ Almacenamiento lleno. Exporta tus datos ya.', 6000);
+      return ok;
+    }
 
     function createProject(nombre) {
       const projects = getProjects();
@@ -2051,8 +2135,9 @@ Genera las notas AHORA en JSON estricto con las secciones obligatorias y sin mul
         markdown: currentNotionMarkdown,
         noteKey: currentNoteKey
       });
-      saveProjects(projects);
-      showToast(`✅ Guardado en "${project.nombre}"`);
+      if (saveProjects(projects)) {
+        showToast(`✅ Guardado en "${project.nombre}"`);
+      }
     }
 
     function formatFecha(iso) {
@@ -2172,7 +2257,10 @@ Genera las notas AHORA en JSON estricto con las secciones obligatorias y sin mul
       ).join('\n\n');
 
       openModal(`🧠 Resumen Global — ${project.nombre}`, 'Generando resumen con Groq…');
-      const model = memoriaTemporal.obtener(LS_KEY_MODEL) || 'llama-3.3-70b-versatile';
+      const model = memoriaTemporal.obtener(LS_KEY_MODEL) || (await fetchAvailableModels())[0] || 'openai/gpt-oss-120b';
+      
+      const btnGlobal = document.getElementById('btn-global-summary');
+      if (btnGlobal) btnGlobal.disabled = true;
 
       const systemPrompt = `Eres un asistente experto. Recibirás varias notas Markdown de distintas sesiones de un mismo proyecto. Genera un "Resumen Global" en Markdown bien estructurado.
 REGLAS:
@@ -2259,6 +2347,8 @@ REGLAS:
       } catch (err) {
         console.error('Error generando resumen global:', err);
         if (modalContent) modalContent.textContent = `⚠️ Error: ${err.message}`;
+      } finally {
+        if (btnGlobal) btnGlobal.disabled = false;
       }
     }
 
