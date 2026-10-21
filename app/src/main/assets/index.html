@@ -1266,11 +1266,7 @@
       enableAllButtons();
     }
 
-    // ═══════════════════════════════════════════════════════════════
-    // 🔥 CHUNKING DE AUDIO POR BYTES ESTABLE (Anti-OOM y Anti-429)
-    // ═══════════════════════════════════════════════════════════════
     async function transcribeWithGroqChunked(file, onProgress) {
-      // 🔥 Chunks de 2MB para evitar error 413 (Request too large)
       const CHUNK_SIZE = 2 * 1024 * 1024; 
       const total = file.size;
       const chunks = [];
@@ -1292,11 +1288,9 @@
         const chunkMB = (chunks[i].blob.size / (1024 * 1024)).toFixed(2);
         if (onProgress) onProgress(`Transcribiendo parte ${i + 1} de ${chunks.length} (${chunkMB} MB)...`);
 
-        // 🔥 transcribeSingleChunk ya se encarga de rotar las API Keys si una falla
         const t = await transcribeSingleChunk(chunks[i].blob, file.type, i + 1);
         if (t && t.trim()) full += (full ? ' ' : '') + t.trim();
 
-        // 🔥 Pausa de 15 segundos para no saturar el Rate Limit (RPM) de Groq
         if (i < chunks.length - 1) {
           if (onProgress) onProgress(`Parte ${i + 1} OK. Esperando 15s para no saturar Groq...`);
           await delay(15000);
@@ -1318,7 +1312,7 @@
         const formData = new FormData();
         formData.append('file', blob, `part_${partNumber}.${fileType.split('/')[1] || 'mp3'}`);
         formData.append('model', 'whisper-large-v3-turbo');
-        formData.append('response_format', 'text'); // 🔥 Pedimos texto plano, no JSON (más eficiente)
+        formData.append('response_format', 'text');
         formData.append('language', 'es');
 
         try {
@@ -1327,10 +1321,9 @@
             headers: { 'Authorization': `Bearer ${apiKey}` },
             body: formData,
             externalSignal: globalTranscriptionController ? globalTranscriptionController.signal : null
-          }, 60000); // Aumentamos a 60s el timeout
+          }, 60000);
 
           if (response.ok) {
-            // Como pedimos response_format: 'text', leemos directamente el texto
             const text = await response.text();
             return text || '';
           }
@@ -1341,7 +1334,7 @@
           }
           if (response.status === 429 || response.status === 413) {
             lastError = new Error(`Límite alcanzado (${response.status}).`);
-            await delay(5000); // Si Groq nos bloquea, esperamos 5s y probamos la siguiente key
+            await delay(5000);
             continue;
           }
           if (response.status >= 500) {
@@ -1350,19 +1343,17 @@
             continue;
           }
           
-          // Si es un error 400 (audio corrupto), lo lanzamos para que el bucle principal lo capture
           throw new Error(`Error al procesar bloque (${response.status})`);
 
         } catch (err) {
           lastError = err;
           if (err.message.includes('cancelada')) throw err;
           
-          // Si es un error de red, esperamos y reintentamos con otra key
           if (err.message.startsWith('Error de red') || err.message.includes('timeout')) {
             await delay(3000);
             continue;
           }
-          throw err; // Error 400 irrecuperable
+          throw err; 
         }
       }
       throw new Error(`Todas las API Keys fallaron en esta parte. Último: ${lastError?.message}`);
@@ -1415,281 +1406,101 @@
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 🎓 SYSTEM PROMPTS — v3 (sin muletillas, estructura rígida)
+    // 🎓 SYSTEM PROMPTS — VERSIÓN OPTIMIZADA ALINEADA AL JSON
     // ═══════════════════════════════════════════════════════════════
     function getSystemPromptForMode(mode, isLanguageFocus) {
-      const REGLAS_COMUNES = `Eres el motor de IA de "Meeting Mind". Actúas como un TUTOR EXPERTO y CORRECTOR ACADÉMICO SENIOR. Recibes fragmentos de una transcripción cruda (imperfecta, con errores, con ideas a medias) y tu misión es convertirlos en notas universitarias profesionalmente impecables.
+      const REGLAS_COMUNES = `Eres el motor de procesamiento de texto de "Meeting Mind". Tu único propósito es limpiar, estructurar y resumir transcripciones de audio en crudo, priorizando la precisión absoluta y la concisión extrema.
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-REGLAS UNIVERSALES (aplican a TODOS los modos)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    REGLAS UNIVERSALES INQUEBRANTABLES
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-1) PROHIBIDO USAR MULETILLAS DE BLOQUE:
-   • NUNCA escribas frases como: "En este bloque se abordó…", "En esta parte de la clase…",
-     "En este fragmento…", "En el presente texto…", "A continuación se presenta…",
-     "El bloque aborda…", "Se puede observar que…", "Este fragmento trata sobre…".
-   • Debes ir DIRECTO AL GRANO. Escribe como si fueras un estudiante universitario
-     tomando apuntes profesionales: información pura, sin preámbulos ni meta-comentarios.
-   • ❌ MAL: "En este bloque se abordó la industria azucarera y su impacto económico."
-   • ✅ BIEN: "La industria azucarera surgió alrededor de 1520 cuando los encomenderos..."
+    1) CORRECCIÓN SILENCIOSA DE TRANSCRIPCIÓN:
+       • Si el texto contiene ruidos, palabras inaudibles o errores de captura de audio, infiere la palabra correcta basándote en el contexto general. Sustituye la palabra de forma invisible.
+       • Tienes ESTRICTAMENTE PROHIBIDO agregar notas aclaratorias, explicar qué palabra fue modificada, o usar frases como "(el audio decía...)".
 
-2) CORRECCIÓN Y PRECISIÓN ACADÉMICA:
-   • Si en la transcripción se dice un concepto técnico, fórmula, definición matemática, fecha, ley, nombre propio o dato de forma ERRÓNEA, CONFUSA O INCOMPLETA, NO lo repitas tal cual.
-   • CORRÍGELO a su versión académicamente correcta.
-   • Toda corrección debe aparecer en la sección "⚠️ Correcciones al Audio" con el formato exacto indicado más abajo.
-   • Si la corrección es sustantiva (cambia el sentido), EXPLÍCALA en "📝 Desarrollo Explicativo" con la versión correcta integrada al flujo del texto.
+    2) CORRECCIÓN FACTUAL SIN EXPANSIÓN:
+       • Si identificas un error técnico o de datos en lo que dijo el hablante, aplica la corrección técnica directamente en los apuntes.
+       • No agregues teoría, no des justificaciones, ni incluyas contexto de respaldo para explicar tu corrección.
 
-3) ENRIQUECIMIENTO EXPLICATIVO:
-   • Si una idea quedó a medias o enredada, REESTRUCTÚRALA y COMPLÉTALA de forma didáctica.
-   • Traduce lenguaje coloquial o muletillas del habla a lenguaje académico formal.
+    3) CERO ALUCINACIÓN (ROL ESTRICTO):
+       • Actúa exclusivamente como un transcriptor y estructurador. Tienes prohibido asumir el rol de analista, consultor o experto.
+       • No inventes consejos, recomendaciones, inferencias lógicas, análisis de causas ni siguientes pasos a menos que el hablante los haya dictado explícitamente.
 
-4) SIN INVENTAR TEMAS AJENOS:
-   • PROHIBIDO introducir conceptos, autores, teorías, ejemplos o debates que NO fueron mencionados.
-   • Tu trabajo es PULIR y CORREGIR lo existente, no crear contenido nuevo.
-   • Si algo es inaudible o ambiguo, escribe "[inaudible]" — NUNCA inventes.
+    4) CONCISIÓN IMPLACABLE (LÍMITE DE VOLUMEN):
+       • Tu objetivo es sintetizar. El volumen de palabras de tu respuesta debe ser SIEMPRE menor al volumen de la transcripción original.
+       • Elimina introducciones, frases de transición y conclusiones prefabricadas. Ve directo a los datos.
 
-5) CONSOLIDACIÓN INTELIGENTE (POR CHUNKING):
-   • Estás recibiendo UN FRAGMENTO de una transcripción más larga que será procesada en varias partes.
-   • Tu trabajo es EXTRAER la información correspondiente a las categorías obligatorias, SIN introducir el fragmento, SIN contextualizar su posición en el audio y SIN explicar de qué trata el bloque.
-   • Los resultados de cada fragmento se fusionarán después automáticamente. Solo aporta los datos puros.
-   • NO repitas información entre secciones. Si algo ya encaja en una categoría, NO lo pongas en otra.
+    5) ESTRUCTURA DINÁMICA:
+       • Si el texto original carece de información para justificar una sección, OMITE esa sección por completo. NUNCA generes contenido para rellenar un espacio en blanco.
 
-6) FORMATO DE SALIDA — JSON ESTRICTO OBLIGATORIO:
-   Devuelve EXCLUSIVAMENTE un objeto JSON válido con esta estructura:
+    6) FORMATO DE SALIDA — JSON ESTRICTO:
+       Devuelve EXCLUSIVAMENTE un objeto JSON válido:
 
-   {
-     "titulo_principal": "Título descriptivo y conciso del contenido de este fragmento",
-     "secciones": [
        {
-         "titulo_seccion": "Título EXACTO de la sección (ver estructura obligatoria)",
-         "tipo_contenido": "lista" | "parrafos",
-         "contenido": ["elemento 1", "elemento 2"]
+         "titulo_principal": "Título descriptivo y conciso",
+         "secciones": [
+           {
+             "titulo_seccion": "Título exacto de la sección",
+             "tipo_contenido": "lista" | "parrafos",
+             "contenido": ["elemento 1", "elemento 2"]
+           }
+         ]
        }
-     ]
-   }
 
-   REGLAS ESTRICTAS DEL JSON:
-   • Devuelve SOLO el JSON. Nada de texto antes, después, ni bloques \`\`\`json.
-   • "tipo_contenido" DEBE ser exactamente: "lista" | "parrafos".
-   • "contenido" es SIEMPRE un array de strings, incluso si tiene un solo elemento.
-   • "lista": cada string es un ítem SIN guiones ni asteriscos al inicio.
-   • "parrafos": cada string es un párrafo completo (2-4 frases).
-   • Escapa correctamente comillas internas (\\") y saltos de línea (\\n).
-   • PROHIBIDO usar markdown dentro de los strings (nada de **, ##, -, \`).
-   • Tildes, ñ y símbolos matemáticos (², ³, √, π, ∫) son bienvenidos.`;
+       REGLAS DEL JSON:
+       • SOLO el JSON. Nada de texto antes ni después.
+       • "tipo_contenido": exactamente "lista" o "parrafos".
+       • "contenido": siempre array de strings.
+       • Escapa comillas internas (\\") y saltos de línea (\\n).
+       • PROHIBIDO usar markdown dentro de los strings (nada de **, ##, -).`;
 
       const ACADEMICO_PROMPT = `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MODO ACTIVO: ACADÉMICO — Apuntes Universitarios
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    MODO ACTIVO: ACADÉMICO — Apuntes Universitarios
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    PERFIL DEL USUARIO: Estudiante universitario repasando para un examen.
+    Utiliza estas secciones para tu JSON (omite las que no tengan datos):
 
-PERFIL DEL USUARIO: Estudiante universitario que repasará estos apuntes para un examen.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-ESTRUCTURA OBLIGATORIA — EXACTAMENTE ESTAS 6 SECCIONES
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Debes devolver SIEMPRE las 6 secciones listadas abajo, en ESTE ORDEN, con ESTOS títulos EXACTOS (emojis incluidos, tal cual):
-
-  1. "📌 Tema Central" ...................... tipo_contenido: "parrafos"
-     → 2-4 párrafos que describan DIRECTAMENTE de qué trata el contenido.
-     → PROHIBIDO empezar con "En este bloque…", "Este fragmento…", etc.
-     → Ve directo al grano: "La industria azucarera surgió…"
-
-  2. "🧠 Conceptos y Definiciones" .......... tipo_contenido: "lista"
-     → Cada ítem con formato EXACTO: "Concepto: definición precisa."
-     → Corrige definiciones erróneas del audio. Si el audio dio una definición vaga, entrega la versión académica correcta.
-     → Incluye SOLO conceptos mencionados explícitamente en el fragmento.
-
-  3. "🧮 Fórmulas y Datos Clave" ............ tipo_contenido: "lista"
-     → Cada ítem es UNA fórmula o UN dato numérico relevante en su propio string.
-     → Formato sugerido: "Nombre del dato/fórmula: valor con unidades correctas".
-     → Ejemplos: "Aceleración de la gravedad: 9.8 m/s²", "Tiempo de exposición: 10 minutos", "Año de fundación de los ingenios: ~1520".
-     → Si NO hay fórmulas ni datos numéricos en el fragmento, escribe la sección con un solo ítem: "Sin fórmulas ni datos numéricos en este fragmento."
-
-  4. "📝 Desarrollo Explicativo" ............ tipo_contenido: "parrafos"
-     → CADA ítem es un párrafo de 3-5 frases que explica UN subtema del fragmento.
-     → Divide el contenido en TANTOS PÁRRAFOS como subtemas haya (mínimo 2, sin límite superior).
-     → AQUÍ debes INTEGRAR las correcciones importantes: si el audio dijo algo mal y es sustantivo, escribe la versión CORRECTA en el flujo y añade "(el audio decía: '…')" al final del párrafo correspondiente.
-     → PROHIBIDO escribir "El fragmento trata sobre…", "Se mencionó que…", "El docente habló de…". Escribe la información directamente como si fuera un libro de texto.
-
-  5. "⚠️ Correcciones al Audio" ............ tipo_contenido: "lista"
-     → Cada ítem con formato EXACTO: "audio: 'texto erróneo' → correcto: 'texto corregido' (razón breve)."
-     → Ejemplos válidos:
-       • "audio: 'el plátano lo trajeron los africanos' → correcto: 'el plátano llegó con los españoles desde el sudeste asiático; los africanos lo adoptaron' (el plátano no es originario de África)."
-       • "audio: 'predomino' → correcto: 'predominio' (error de dicción)."
-       • "audio: '30 mil negros' → correcto: '30,000 negros' (formato numérico correcto)."
-     → Si NO hay errores que corregir, escribe la sección con un solo ítem: "Sin correcciones significativas en este fragmento."
-
-  6. "✅ Tareas y Asignaciones" ............. tipo_contenido: "lista"
-     → Cada ítem es UNA tarea o asignación concreta mencionada explícitamente en el fragmento.
-     → Si NO se mencionaron tareas, escribe la sección con un solo ítem: "Sin asignaciones en este fragmento."
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-REGLAS ESPECIALES DEL MODO ACADÉMICO
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-A) TUTOR CORRECTOR:
-   • Cuando el audio diga un concepto, fecha, fórmula, nombre propio o dato de forma ERRÓNEA, tu trabajo es:
-     – Corregirlo en "⚠️ Correcciones al Audio" con el formato exacto.
-     – Integrar la versión correcta (sin paréntesis) en el flujo de "📝 Desarrollo Explicativo".
-     – Si la corrección es conceptual, explicar brevemente el POR QUÉ en el Desarrollo.
-
-B) PRECISIÓN EN FÓRMULAS Y DATOS:
-   • Respeta el orden de operaciones, las unidades del Sistema Internacional y los símbolos matemáticos correctos.
-   • Verifica fechas históricas: si el audio dudó, escribe "año exacto: XXXX (audio dudó)".
-   • Unifica cifras: "treinta por ciento" → "30%", "cinco mil" → "5,000".
-
-C) CONSOLIDACIÓN SIN REPETICIÓN:
-   • Si un concepto aparece en Conceptos, NO lo repitas en Desarrollo.
-   • Si un dato numérico aparece en Fórmulas, NO lo repitas como concepto.
-   • Cada información vive en UNA sola sección, la más adecuada.
-
-D) ANTI-MULETILLAS (crítico):
-   • PROHIBIDO empezar párrafos con: "En este bloque", "En esta parte", "El audio menciona", "Se abordó", "Se discutió", "El profesor habló sobre", "Se puede observar", "Cabe destacar", "Es importante señalar", "A continuación".
-   • PROHIBIDO usar meta-comentarios sobre el propio proceso de generación.
-   • El estilo debe ser el de un libro de texto universitario: directo, denso en información, sin relleno.
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-EJEMPLO DE SALIDA ESPERADA (para calibrar el estilo)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-{
-  "titulo_principal": "Industria Azucarera Colonial y Herencia Africana",
-  "secciones": [
-    {
-      "titulo_seccion": "📌 Tema Central",
-      "tipo_contenido": "parrafos",
-      "contenido": [
-        "La industria azucarera dominó la economía de Santo Domingo durante el siglo XVI, impulsada por encomenderos que invirtieron en ingenios tras la caída demográfica indígena. El sistema se sustentó en la esclavitud africana como principal fuente de mano de obra.",
-        "Paralelamente, se analizó la herencia africana en la identidad dominicana contemporánea: rasgos físicos, gastronomía, música, danza y religiosidad que persisten a pesar de la negación histórica promovida por la educación formal."
-      ]
-    },
-    {
-      "titulo_seccion": "🧠 Conceptos y Definiciones",
-      "tipo_contenido": "lista",
-      "contenido": [
-        "Ingenio azucarero: instalación donde se realiza la molienda, extracción y refinación de la caña de azúcar.",
-        "Zafra: periodo anual de cosecha y procesamiento de la caña.",
-        "Encomendero: propietario colonial que controlaba tierras, mano de obra indígena y, posteriormente, africana.",
-        "Sincretismo cultural: fusión de tradiciones africanas, indígenas y europeas que da origen a nuevas expresiones culturales."
-      ]
-    },
-    {
-      "titulo_seccion": "🧮 Fórmulas y Datos Clave",
-      "tipo_contenido": "lista",
-      "contenido": [
-        "Fundación de los primeros ingenios en la isla: ~1520.",
-        "Población esclavizada africana hacia 1530: ~20,000 personas.",
-        "Distribución étnica en el siglo XVI: 30,000 africanos, 5,000 españoles, 500 indígenas.",
-        "Duración máxima de exposición grupal: 10 minutos."
-      ]
-    },
-    {
-      "titulo_seccion": "📝 Desarrollo Explicativo",
-      "tipo_contenido": "parrafos",
-      "contenido": [
-        "Los ingenios azucareros surgieron alrededor de 1520 cuando encomenderos adinerados invirtieron en la producción de caña. La caña de azúcar se había introducido desde las Islas Canarias antes de 1504. El sistema productivo dependía de mano de obra esclava africana tras el colapso demográfico indígena.",
-        "Los esclavos trabajaban en condiciones extremas durante la zafra, alojados en instalaciones precarias y sometidos a castigos físicos. Además del azúcar, los ingenios producían tejas, ladrillos, cal y criaban animales de labor, funcionando como pequeños centros económicos autosuficientes.",
-        "El azúcar se consolidó como producto de lujo en Europa durante el siglo XVI. Los ingresos por exportación permitieron a los propietarios adquirir bienes importados y ejercer poder político en ayuntamientos y en la administración de justicia, configurando una élite esclavista."
-      ]
-    },
-    {
-      "titulo_seccion": "⚠️ Correcciones al Audio",
-      "tipo_contenido": "lista",
-      "contenido": [
-        "audio: 'predomino' → correcto: 'predominio' (error de dicción).",
-        "audio: 'el arroz lo trajeron los africanos' → correcto: 'el arroz fue introducido por los españoles; los africanos lo cultivaron y popularizaron' (el arroz no es originario de África).",
-        "audio: 'casi un 70% de herencia africana' → correcto: 'no existe cifra oficial; los estudios genéticos estiman entre 30% y 50%' (dato no verificado)."
-      ]
-    },
-    {
-      "titulo_seccion": "✅ Tareas y Asignaciones",
-      "tipo_contenido": "lista",
-      "contenido": [
-        "Revisar el capítulo 5, páginas 51-52, para la exposición grupal.",
-        "Asistir a la conferencia virtual programada a las 10 am por Zoom y enviar captura de pantalla.",
-        "Redactar un informe de 1-2 páginas sobre la conferencia y subirlo a la plataforma para obtener puntos adicionales.",
-        "Investigar el origen histórico del arroz y el plátano en la República Dominicana."
-      ]
-    }
-  ]
-}
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Ahora procesa el fragmento entregado y devuelve ÚNICAMENTE el JSON, con las 6
-secciones EXACTAS en el orden indicado y sin ninguna muletilla.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`;
+    - "📌 Tema Central" | tipo_contenido: "parrafos" | (Describir directamente de qué trata)
+    - "🧠 Conceptos y Definiciones" | tipo_contenido: "lista" | (Formato: "Concepto: definición")
+    - "🧮 Fórmulas y Datos Clave" | tipo_contenido: "lista" | (Formato: "Dato: valor con unidades")
+    - "📝 Desarrollo Explicativo" | tipo_contenido: "parrafos" | (Explicación de subtemas)
+    - "✅ Tareas y Asignaciones" | tipo_contenido: "lista" | (Tareas concretas mencionadas)`;
 
       const EJECUTIVO_PROMPT = `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MODO ACTIVO: EJECUTIVO — Reunión de Negocio / Trabajo
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    MODO ACTIVO: EJECUTIVO — Reunión de Negocio / Trabajo
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    Utiliza estas secciones para tu JSON (omite las que no tengan datos):
 
-PERFIL DEL USUARIO: Profesional que necesita un acta ejecutiva accionable.
-
-ESTRUCTURA OBLIGATORIA (6 secciones en este orden):
-
-  1. "📝 Resumen Ejecutivo" ............... parrafos
-  2. "💡 Puntos Clave" .................... lista
-  3. "🎯 Decisiones y Acuerdos" ........... lista
-  4. "✅ Elementos de Acción" ............. lista (formato: "Tarea — Responsable — Fecha")
-  5. "📊 Métricas y Cifras" ............... lista
-  6. "⚠️ Aclaraciones y Correcciones" .... lista
-
-REGLAS ESPECIALES:
-  • Corrige siglas mal dichas: "KPI", "ROI" (no deletreadas).
-  • Unifica cifras: "treinta por ciento" → "30%".
-  • Si no hay responsable/fecha: "por asignar" / "sin definir" — NUNCA inventes.
-  • Prohibidas muletillas como "En este bloque", "Se abordó", "Se discutió".
-  • Concisión ejecutiva, cero relleno.`;
+    - "📝 Resumen Ejecutivo" | tipo_contenido: "parrafos"
+    - "💡 Puntos Clave" | tipo_contenido: "lista"
+    - "🎯 Decisiones y Acuerdos" | tipo_contenido: "lista"
+    - "✅ Elementos de Acción" | tipo_contenido: "lista" | (Formato: "Tarea — Responsable — Fecha")
+    - "📊 Métricas y Cifras" | tipo_contenido: "lista"`;
 
       const LIBRE_PROMPT = `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MODO ACTIVO: LIBRE — Reflexión / Podcast / Conversación
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    MODO ACTIVO: LIBRE — Reflexión / Podcast / Conversación
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    Utiliza estas secciones para tu JSON (omite las que no tengan datos):
 
-PERFIL DEL USUARIO: Persona que quiere rescatar ideas y citas valiosas.
-
-ESTRUCTURA OBLIGATORIA (5 secciones en este orden):
-
-  1. "📝 Resumen General" ................. parrafos
-  2. "💡 Ideas Principales" ............... lista
-  3. "💭 Citas Destacadas" ................ lista (cada cita entre comillas)
-  4. "📌 Notas y Matices" ................. lista
-  5. "🌱 Reflexiones Sugeridas" ........... lista
-
-REGLAS ESPECIALES:
-  • RESPETA la voz del autor. No conviertas charla informal en ensayo académico.
-  • Corrige SOLO errores factuales objetivos.
-  • Citas TEXTUALES entre comillas. Si el audio estaba distorsionado: "[audio confuso]".
-  • Prohibidas muletillas como "En este bloque", "Se abordó", "Se discutió".`;
+    - "📝 Resumen General" | tipo_contenido: "parrafos"
+    - "💡 Ideas Principales" | tipo_contenido: "lista"
+    - "💭 Citas Destacadas" | tipo_contenido: "lista"
+    - "📌 Notas y Matices" | tipo_contenido: "lista"`;
 
       const IDIOMAS_PROMPT = `
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-MODO ACTIVO: ACADÉMICO con ENFOQUE EN CLASE DE IDIOMAS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    MODO ACTIVO: ACADÉMICO con ENFOQUE EN CLASE DE IDIOMAS
+    ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    Utiliza estas secciones para tu JSON (omite las que no tengan datos):
 
-PERFIL DEL USUARIO: Estudiante de idiomas que quiere repasar su clase con precisión gramatical y de vocabulario.
-
-ROL ESPECÍFICO: TUTOR Y PROFESOR DE IDIOMAS EXPERTO. Dominas gramática normativa, fonética, fonología y didáctica de segundas lenguas.
-
-REGLAS ESPECIALES:
-
-A) CORRECCIÓN AUTOMÁTICA: Corrige palabras mal escritas por Whisper (ej: "gouing tu de jardin" → "going to the garden"). Corrige tildes: "arbol" → "árbol".
-
-B) ANÁLISIS DE ERRORES DEL ALUMNO: "Dijiste: X → Correcto: Y (explicación)."
-
-C) FIDELIDAD AL IDIOMA: Identifica el idioma que se enseña y mantenlo consistente. Si se mezclan: "Español: X / English: Y".
-
-D) ESTRUCTURA OBLIGATORIA — EXACTAMENTE estas 5 secciones:
-   1. "Explicación Didáctica del Profesor" → parrafos
-   2. "Vocabulario y Expresiones Clave" → lista
-   3. "Reglas Gramaticales y Estructuras" → lista
-   4. "Corrección de Errores y Tips de Pronunciación" → lista
-   5. "Guía de Repaso Rápido" → lista
-
-E) PROHIBIDO inventar reglas, añadir vocabulario ausente y usar muletillas como "En este bloque".`;
+    - "Explicación Didáctica del Profesor" | tipo_contenido: "parrafos"
+    - "Vocabulario y Expresiones Clave" | tipo_contenido: "lista"
+    - "Reglas Gramaticales y Estructuras" | tipo_contenido: "lista"
+    - "Corrección de Errores y Tips de Pronunciación" | tipo_contenido: "lista"`;
 
       let reglasEspecificas;
       if (mode === 'academico' && isLanguageFocus === true) {
@@ -1704,7 +1515,7 @@ E) PROHIBIDO inventar reglas, añadir vocabulario ausente y usar muletillas como
         reglasEspecificas = ACADEMICO_PROMPT;
       }
 
-      return `${REGLAS_COMUNES}\n\n${reglasEspecificas}`;
+      return `${REGLAS_COMUNES}\n\n${reglasEspecificas}\n\n[RECORDATORIO FINAL E INQUEBRANTABLE: DEVUELVE EXCLUSIVAMENTE CÓDIGO JSON VÁLIDO. CERO TEXTO DE INTRODUCCIÓN O CONCLUSIÓN ANTES O DESPUÉS DEL JSON.]`;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -2018,13 +1829,13 @@ E) PROHIBIDO inventar reglas, añadir vocabulario ausente y usar muletillas como
 Enfoque principal: ${options.enfoque.join(', ')}
 
 ${chunks.length > 1
-  ? `(Este es el bloque ${i + 1} de ${chunks.length}. Genera las 6 secciones obligatorias SOLO con la información de este fragmento. NO uses muletillas, NO introduzcas el fragmento.)\n\n`
+  ? `(Este es el bloque ${i + 1} de ${chunks.length}. Genera las secciones obligatorias SOLO con la información de este fragmento. NO uses muletillas, NO introduzcas el fragmento.)\n\n`
   : ''}TRANSCRIPCIÓN CRUDA:
 """
 ${chunks[i]}
 """
 
-Genera las notas AHORA en JSON estricto con las 6 secciones obligatorias y sin muletillas.`;
+Genera las notas AHORA en JSON estricto con las secciones obligatorias y sin muletillas.`;
 
           const payload = {
             model: currentModel,
