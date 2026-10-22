@@ -247,6 +247,7 @@
       .prompt-check-grid { grid-template-columns: 1fr; }
       .prompt-actions { flex-direction: column-reverse; }
       .prompt-btn-secondary { width: 100%; }
+      #summary-level-chips { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -395,6 +396,45 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="detail-select-modal">
+    <div class="modal-box" style="max-width: 520px;">
+      <h3>📊 ¿Cómo quieres tus notas?</h3>
+      <p class="modal-subtitle">La transcripción está lista. Elige el nivel de detalle de las notas que se generarán ahora.</p>
+
+      <div class="prompt-step">
+        <div class="prompt-step-label"><span class="prompt-step-num">1</span> Nivel de detalle</div>
+        <div class="prompt-cat-chips" id="detail-select-chips">
+          <button type="button" class="prompt-cat-chip" data-detail="detallado">
+            <span class="cat-emoji">📚</span> Detallado
+          </button>
+          <button type="button" class="prompt-cat-chip" data-detail="resumido">
+            <span class="cat-emoji">✂️</span> Resumido
+          </button>
+        </div>
+      </div>
+
+      <div class="prompt-step" id="summary-level-section" style="display:none;">
+        <div class="prompt-step-label"><span class="prompt-step-num">2</span> Nivel de resumen</div>
+        <div class="prompt-cat-chips" id="summary-level-chips" style="grid-template-columns: repeat(3, 1fr);">
+          <button type="button" class="prompt-cat-chip" data-level="nivel1">
+            <span class="cat-emoji">1️⃣</span> Breve
+          </button>
+          <button type="button" class="prompt-cat-chip" data-level="nivel2">
+            <span class="cat-emoji">2️⃣</span> Balanceado
+          </button>
+          <button type="button" class="prompt-cat-chip" data-level="nivel3">
+            <span class="cat-emoji">3️⃣</span> Exhaustivo
+          </button>
+        </div>
+      </div>
+
+      <div class="prompt-actions">
+        <button type="button" class="prompt-btn prompt-btn-secondary" id="detail-select-cancel">Omitir por ahora</button>
+        <button type="button" class="prompt-btn prompt-btn-primary" id="detail-select-confirm" disabled>Generar Notas</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="modal-overlay">
     <div class="modal-box">
       <h3 id="modal-title">🧠 Resumen Global</h3>
@@ -407,7 +447,6 @@
     // ═══════════════════════════════════════════════════════════════
     // 🎙️ GROQ — Keys y endpoints
     // ═══════════════════════════════════════════════════════════════
-    // C2: Eliminadas las keys por defecto por seguridad.
     const GROQ_KEYS_DEFAULT = []; 
 
     const LS_KEY_GROQ_KEYS = 'meetingmind_groq_keys';
@@ -449,7 +488,7 @@
         groqKeyIndex = (groqKeyIndex + 1) % GROQ_KEYS.length;
         if ((keyCooldown.get(k) || 0) <= now) return k;
       }
-      return GROQ_KEYS[groqKeyIndex]; // all in cooldown, return next anyway
+      return GROQ_KEYS[groqKeyIndex];
     }
 
     function saveGroqKeys(keysArray) {
@@ -562,7 +601,6 @@
 
     function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-    // A5: fetchWithTimeout con parse interno
     async function fetchWithTimeout(url, options = {}, timeoutMs = 30000, parse = null) {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -611,7 +649,6 @@
       txt.textContent = text;
     }
 
-    // C3: Modelos actualizados y fallbacks
     let cachedAvailableModels = null;
     async function fetchAvailableModels(forceRefresh = false) {
       if (cachedAvailableModels && !forceRefresh) return cachedAvailableModels;
@@ -630,7 +667,6 @@
         const data = response.parsed;
         const ids = (data.data || []).map(m => m.id);
         
-        // Filtro de modelos válidos (incluyendo qwen)
         const valid = ids.filter(id => {
           const low = id.toLowerCase();
           return !low.includes('whisper') &&
@@ -668,7 +704,6 @@
       }
     }
 
-    // A7: LocalStorage a prueba de cuota
     const memoriaTemporal = {
       datos: {},
       guardar(c, v) { 
@@ -685,6 +720,8 @@
     let currentNoteKey = '';
     let currentOpenProjectId = null;
     let currentSessionMode = null;
+    let currentDetailLevel = null;
+    let currentSummaryLevel = null;
 
     let micStream = null;
     let currentRecorder = null;
@@ -693,6 +730,7 @@
     let recordingChunkInterval = null;
 
     let modeSelectState = { mode: null, pendingAction: null };
+    let detailSelectState = { detailLevel: null, summaryLevel: null, pendingAction: null };
     let wakeLock = null;
 
     async function requestWakeLock() {
@@ -718,7 +756,6 @@
       if (notice) notice.classList.remove('show');
     }
 
-    // A8: Funciones de portapapeles y descargas adaptadas a WebView
     async function copyText(t) {
       try { if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(t); return true; } } catch (_) {}
       const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0';
@@ -817,6 +854,7 @@
         });
       });
 
+      // BUG FIX #2: Los botones deben pasar por el modal de modo
       btnStartRecord.addEventListener('click', () => {
         if (isRecordingActive) stopRecordingProcess();
         else openModeSelectModal('record');
@@ -887,6 +925,7 @@
       });
 
       initModeSelectModalListeners();
+      initDetailSelectModalListeners();
       renderProjectsTab();
 
       document.getElementById('btn-export-data').addEventListener('click', () => {
@@ -965,6 +1004,9 @@
       }
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // 🎯 MODAL DE MODO
+    // ═══════════════════════════════════════════════════════════════
     function initModeSelectModalListeners() {
       const modal = document.getElementById('mode-select-modal');
       const chips = document.querySelectorAll('#mode-select-chips .prompt-cat-chip');
@@ -1003,7 +1045,7 @@
         modeSelectState = { mode: null, pendingAction: null };
         if (action === 'record') startRecordingProcess();
         else if (action === 'upload') document.getElementById('file-input').click();
-        else if (action === 'analyze-pasted') triggerAutoAnalysis();
+        else if (action === 'analyze-pasted') openDetailSelectModal('analyze-pasted');
       });
     }
 
@@ -1013,6 +1055,102 @@
       chips.forEach(c => c.classList.toggle('selected', c.dataset.mode === currentSessionMode));
       document.getElementById('mode-select-confirm').disabled = !currentSessionMode;
       document.getElementById('mode-select-modal').classList.add('open');
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 🆕 MODAL DE DETALLE
+    // ═══════════════════════════════════════════════════════════════
+    function initDetailSelectModalListeners() {
+      const modal = document.getElementById('detail-select-modal');
+      const detailChips = modal.querySelectorAll('#detail-select-chips .prompt-cat-chip');
+      const levelChips = modal.querySelectorAll('#summary-level-chips .prompt-cat-chip');
+      const levelSection = document.getElementById('summary-level-section');
+      const btnCancel = document.getElementById('detail-select-cancel');
+      const btnConfirm = document.getElementById('detail-select-confirm');
+
+      function updateConfirmButton() {
+        const d = detailSelectState.detailLevel;
+        const l = detailSelectState.summaryLevel;
+        btnConfirm.disabled = !d || (d === 'resumido' && !l);
+      }
+
+      detailChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          detailSelectState.detailLevel = chip.dataset.detail;
+          detailChips.forEach(c => c.classList.toggle('selected', c === chip));
+          if (chip.dataset.detail === 'resumido') {
+            levelSection.style.display = 'block';
+            if (!detailSelectState.summaryLevel) {
+              detailSelectState.summaryLevel = 'nivel2';
+              levelChips.forEach(c => c.classList.toggle('selected', c.dataset.level === 'nivel2'));
+            }
+          } else {
+            levelSection.style.display = 'none';
+          }
+          updateConfirmButton();
+        });
+      });
+
+      levelChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          detailSelectState.summaryLevel = chip.dataset.level;
+          levelChips.forEach(c => c.classList.toggle('selected', c === chip));
+          updateConfirmButton();
+        });
+      });
+
+      btnCancel.addEventListener('click', () => {
+        modal.classList.remove('open');
+        detailSelectState = { detailLevel: null, summaryLevel: null, pendingAction: null };
+        document.getElementById('notes-container').innerHTML =
+          '<div class="state-msg"><span class="big">✨</span><span>Transcripción lista. Pulsa "Analizar Texto Pegado" cuando quieras generar notas.</span></div>';
+      });
+
+      modal.addEventListener('click', (e) => {
+        if (e.target.id === 'detail-select-modal') {
+          modal.classList.remove('open');
+          detailSelectState = { detailLevel: null, summaryLevel: null, pendingAction: null };
+        }
+      });
+
+      btnConfirm.addEventListener('click', async () => {
+        if (!detailSelectState.detailLevel) return;
+        currentDetailLevel = detailSelectState.detailLevel;
+        currentSummaryLevel = detailSelectState.summaryLevel;
+        const action = detailSelectState.pendingAction;
+        modal.classList.remove('open');
+        detailSelectState = { detailLevel: null, summaryLevel: null, pendingAction: null };
+
+        if (action === 'analyze-pasted') {
+          await runAnalysisWithCurrentOptions();
+        }
+      });
+    }
+
+    function openDetailSelectModal(action) {
+      detailSelectState = {
+        detailLevel: currentDetailLevel || 'resumido',
+        summaryLevel: currentSummaryLevel || 'nivel2',
+        pendingAction: action
+      };
+      const modal = document.getElementById('detail-select-modal');
+      const detailChips = modal.querySelectorAll('#detail-select-chips .prompt-cat-chip');
+      const levelChips = modal.querySelectorAll('#summary-level-chips .prompt-cat-chip');
+      const levelSection = document.getElementById('summary-level-section');
+
+      detailChips.forEach(c => c.classList.toggle('selected', c.dataset.detail === detailSelectState.detailLevel));
+      levelChips.forEach(c => c.classList.toggle('selected', c.dataset.level === detailSelectState.summaryLevel));
+      levelSection.style.display = detailSelectState.detailLevel === 'resumido' ? 'block' : 'none';
+      document.getElementById('detail-select-confirm').disabled = !detailSelectState.detailLevel;
+      modal.classList.add('open');
+    }
+
+    async function runAnalysisWithCurrentOptions() {
+      const text = document.getElementById('transcript-box').value.trim();
+      if (!text || text.length < 20) { showToast('⚠️ Transcripción muy corta para analizar.'); return; }
+      const opts = getSessionOptions();
+      await analyzeText(text, document.getElementById('notes-container'), opts);
+      document.querySelector('[data-tab="notas"]')?.click();
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -1134,7 +1272,6 @@
       }
     }
 
-    // C1: Cola secuencial
     let transcribeQueue = Promise.resolve();
 
     function transcribeRecordedChunk(file) {
@@ -1315,7 +1452,6 @@
       }
     }
 
-    // C4: Transcripción directa vs por tiempo
     const MAX_DIRECT_BYTES = 24 * 1024 * 1024;
     
     function extFromFile(f) {
@@ -1335,7 +1471,7 @@
       try { buf = await ctx.decodeAudioData(await file.arrayBuffer()); }
       finally { ctx.close(); }
       
-      const step = 300 * buf.sampleRate; // 5 min ≈ 9.6 MB en WAV mono 16-bit
+      const step = 300 * buf.sampleRate; 
       const total = Math.ceil(buf.length / step);
       let full = '';
       
@@ -1370,7 +1506,7 @@
 
     async function transcribeSingleChunk(blob, partNumber) {
       let lastError = null;
-      const maxAttempts = 5; // Aumentado para tolerar fallos de red
+      const maxAttempts = 5;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         if (globalTranscriptionController && globalTranscriptionController.signal.aborted) {
           throw new Error('Cancelado por el usuario.');
@@ -1384,10 +1520,9 @@
         formData.append('file', blob, `part_${partNumber}.${ext}`);
         formData.append('model', 'whisper-large-v3-turbo');
         formData.append('response_format', 'text');
-        // A2: Auto-detección en modo idiomas
         if (currentSessionMode !== 'idiomas') formData.append('language', 'es');
 
-        const uploadTimeout = Math.max(60000, (blob.size / 50000) * 1000); // A5: Timeout proporcional
+        const uploadTimeout = Math.max(60000, (blob.size / 50000) * 1000);
 
         try {
           const response = await fetchWithTimeout(GROQ_AUDIO_URL, {
@@ -1431,7 +1566,7 @@
         } catch (err) {
           lastError = err;
           if (err.message.includes('cancelada')) throw err;
-          if (err.message.includes('413') || err.message.includes('400')) throw err; // No reintentar errores de formato
+          if (err.message.includes('413') || err.message.includes('400')) throw err;
           if (err.message.startsWith('Error de red') || err.message.includes('timeout')) {
             await delay(3000);
             continue;
@@ -1452,13 +1587,12 @@
         return;
       }
       if (!currentSessionMode) {
-        showToast('⚠️ Selecciona primero un enfoque de notas.');
-        setStatus('idle', 'Transcripción lista. Pulsa "Analizar Texto Pegado" para generar notas.');
+        showToast('🎯 Elige el enfoque de notas para continuar.');
+        openModeSelectModal('analyze-pasted');
         return;
       }
-      const opts = getSessionOptions();
-      await analyzeText(text, document.getElementById('notes-container'), opts);
-      document.querySelector('[data-tab="notas"]')?.click();
+      setStatus('idle', 'Transcripción lista. Elige cómo quieres tus notas.');
+      openDetailSelectModal('analyze-pasted');
     }
 
     async function triggerAutoAnalysis() {
@@ -1467,13 +1601,8 @@
         showToast('⚠️ Pega primero un texto para analizar (mínimo 20 caracteres).');
         return;
       }
-      if (!currentSessionMode) {
-        openModeSelectModal('analyze-pasted');
-        return;
-      }
-      const opts = getSessionOptions();
-      await analyzeText(text, document.getElementById('notes-container'), opts);
-      document.querySelector('[data-tab="notas"]')?.click();
+      if (!currentSessionMode) { openModeSelectModal('analyze-pasted'); return; }
+      openDetailSelectModal('analyze-pasted');
     }
 
     function getSessionOptions() {
@@ -1484,11 +1613,37 @@
         categoriaLabel: def.categoriaLabel,
         contexto: [...def.contexto],
         enfoque: [...def.enfoque],
-        isLanguageFocus: def.isLanguageFocus === true
+        isLanguageFocus: def.isLanguageFocus === true,
+        detailLevel: currentDetailLevel || 'resumido',
+        summaryLevel: currentSummaryLevel || 'nivel2'
       };
     }
 
-    function getSystemPromptForMode(mode, isLanguageFocus) {
+    function getDetailInstruction(detailLevel, summaryLevel) {
+      if (detailLevel === 'detallado') {
+        return `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NIVEL DE DETALLE: DETALLADO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Captura TODOS los conceptos, datos y ejemplos mencionados.
+• NO omitas información relevante aunque sea secundaria.
+• Usa TODAS las secciones disponibles para este modo.
+• Prioriza exhaustividad sobre brevedad, pero mantén el estilo telegráfico (sin muletillas).`;
+      }
+      const levels = {
+        nivel1: 'MUY BREVE (Nivel 1): Captura SOLO los puntos más importantes. Máximo 3-4 secciones. Cada sección con 2-3 elementos máximo. Prioriza los titulares sobre los detalles.',
+        nivel2: 'BALANCEADO (Nivel 2): Captura los puntos clave con algo de detalle de soporte. 4-6 secciones. Cada sección con 3-5 elementos. Equilibrio entre síntesis y contexto.',
+        nivel3: 'EXHAUSTIVO (Nivel 3): Captura la mayor cantidad de información posible manteniendo la síntesis. Todas las secciones relevantes. Cada sección con 5-8 elementos. No omitas matices.'
+      };
+      const levelText = levels[summaryLevel] || levels.nivel2;
+      return `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+NIVEL DE DETALLE: RESUMIDO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• ${levelText}
+• Omite secciones que no aporten información sustancial.
+• Prioriza síntesis sobre cobertura completa.`;
+    }
+
+    function getSystemPromptForMode(mode, isLanguageFocus, detailLevel, summaryLevel) {
       const REGLAS_COMUNES = `Eres el motor de procesamiento de texto de "Meeting Mind". Tu único propósito es limpiar, estructurar y resumir transcripciones de audio en crudo, priorizando la precisión absoluta y la concisión extrema.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1595,7 +1750,9 @@ Utiliza estas secciones para tu JSON (omite las que no tengan datos):
         reglasEspecificas = ACADEMICO_PROMPT;
       }
 
-      return `${REGLAS_COMUNES}\n\n${reglasEspecificas}\n\n[RECORDATORIO FINAL E INQUEBRANTABLE: DEVUELVE EXCLUSIVAMENTE CÓDIGO JSON VÁLIDO. CERO TEXTO DE INTRODUCCIÓN O CONCLUSIÓN ANTES O DESPUÉS DEL JSON.]`;
+      const detailInstruction = getDetailInstruction(detailLevel, summaryLevel);
+
+      return `${REGLAS_COMUNES}\n\n${reglasEspecificas}\n\n${detailInstruction}\n\n[RECORDATORIO FINAL E INQUEBRANTABLE: DEVUELVE EXCLUSIVAMENTE CÓDIGO JSON VÁLIDO. CERO TEXTO DE INTRODUCCIÓN O CONCLUSIÓN ANTES O DESPUÉS DEL JSON.]`;
     }
 
     async function callGroqChat(payload) {
@@ -1755,7 +1912,6 @@ Utiliza estas secciones para tu JSON (omite las que no tengan datos):
       let html = '';
       if (typeof marked !== 'undefined' && marked.parse) {
         try {
-          // B5: Eliminadas opciones obsoletas (headerIds, mangle)
           marked.setOptions({ gfm: true, breaks: true });
           html = marked.parse(clean);
         } catch (e) {
@@ -1765,7 +1921,6 @@ Utiliza estas secciones para tu JSON (omite las que no tengan datos):
         html = fallbackMarkdownRenderer(clean);
       }
       
-      // A1: Sanitizar HTML contra XSS
       if (typeof DOMPurify !== 'undefined') {
         html = DOMPurify.sanitize(html, { ADD_ATTR: ['checked'] });
       }
@@ -1874,7 +2029,9 @@ Utiliza estas secciones para tu JSON (omite las que no tengan datos):
     async function analyzeText(text, notesContainer, options) {
       const systemPrompt = getSystemPromptForMode(
         options.categoria,
-        options.isLanguageFocus === true
+        options.isLanguageFocus === true,
+        options.detailLevel,
+        options.summaryLevel
       );
 
       disableAllButtons();
@@ -1892,7 +2049,7 @@ Utiliza estas secciones para tu JSON (omite las que no tengan datos):
         const totalWords = String(text || '').trim().split(/\s+/).filter(Boolean).length;
         const chunks = splitIntoWordChunks(text, WORDS_PER_CHUNK);
 
-        console.log(`[analyzeText] ${totalWords} palabras → ${chunks.length} chunk(s)`);
+        console.log(`[analyzeText] ${totalWords} palabras → ${chunks.length} chunk(s) | detalle=${options.detailLevel} nivel=${options.summaryLevel}`);
 
         if (chunks.length === 0) throw new Error('La transcripción está vacía.');
 
@@ -1994,9 +2151,14 @@ Genera las notas AHORA en JSON estricto.`;
         ? projects.map(p => `<option value="${escHtml(p.id)}">${escHtml(p.nombre)}</option>`).join('')
         : '<option value="">Sin proyectos aún</option>';
 
+      const detailBadge = currentDetailLevel === 'detallado'
+        ? '📚 Detallado'
+        : `✂️ Resumido ${{nivel1:'(Breve)', nivel2:'(Balanceado)', nivel3:'(Exhaustivo)'}[currentSummaryLevel] || ''}`;
+
       container.innerHTML = `
         <div class="notes-header">
           <div class="notes-header-left">
+            <span style="font-size:0.72rem;color:var(--muted);background:var(--bg);border:1px solid var(--border);padding:6px 10px;border-radius:99px;">${detailBadge}</span>
             <select id="save-project-select" class="select-inline">${projectOptionsHtml}</select>
             <button id="btn-save-to-project" class="btn-copy-notion">💾 Guardar</button>
           </div>
@@ -2030,7 +2192,7 @@ Genera las notas AHORA en JSON estricto.`;
         btnReconfigure.addEventListener('click', () => {
           const text = document.getElementById('transcript-box').value.trim();
           if (!text) { showToast('⚠️ No hay transcripción disponible.'); return; }
-          openModeSelectModal('analyze-pasted');
+          openDetailSelectModal('analyze-pasted');
         });
       }
 
@@ -2048,6 +2210,10 @@ Genera las notas AHORA en JSON estricto.`;
       document.getElementById('transcript-progress-area').innerHTML = '';
       currentNotionMarkdown = '';
       currentNoteKey = '';
+      currentDetailLevel = null;
+      currentSummaryLevel = null;
+      if (micStream) { try { micStream.getTracks().forEach(t => t.stop()); } catch (_) {} micStream = null; }
+      
       document.getElementById('notes-container').innerHTML = '<div class="state-msg"><span class="big">✨</span><span>Graba o sube un audio, y las notas se generarán automáticamente.</span></div>';
       document.getElementById('btn-clear').style.display = 'none';
       currentSessionMode = null;
@@ -2085,7 +2251,6 @@ Genera las notas AHORA en JSON estricto.`;
       }
     }
 
-    // Red de seguridad para promesas rechazadas
     window.addEventListener('unhandledrejection', e => {
       console.error(e.reason);
       showToast('❌ ' + (e.reason?.message || 'Error inesperado'));
